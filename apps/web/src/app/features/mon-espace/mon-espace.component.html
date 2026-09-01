@@ -1,0 +1,116 @@
+<div class="page">
+  @if (chargement()) {
+    <mat-spinner></mat-spinner>
+  } @else if (erreur()) {
+    <mat-card class="carte">
+      <p class="erreur">{{ erreur() }}</p>
+    </mat-card>
+  } @else {
+    <div class="colonne">
+      <mat-card class="banniere-lien">
+        <mat-icon>link</mat-icon>
+        <div>
+          <strong>Garde ce lien précieusement</strong>
+          <p>
+            C'est lui qui te permet de revenir modifier tes infos plus tard, autant de fois que tu
+            veux — même après le début de l'évènement.
+          </p>
+        </div>
+        <button mat-stroked-button (click)="copierLePersonnel()">
+          <mat-icon>content_copy</mat-icon>
+          Copier
+        </button>
+      </mat-card>
+
+      <mat-card class="carte">
+        <h1>Bonjour {{ pax()?.nom }} 👋</h1>
+
+        <h2>Mes infos</h2>
+        <form [formGroup]="infosForm" (ngSubmit)="enregistrerInfos()">
+          <mat-form-field appearance="outline">
+            <mat-label>Nom</mat-label>
+            <input matInput formControlName="nom" required />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="contactEmail" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Téléphone</mat-label>
+            <input matInput formControlName="contactTelephone" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Commentaire</mat-label>
+            <textarea matInput formControlName="commentaire" rows="2"></textarea>
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" [disabled]="enregistrementInfos()">
+            Enregistrer mes infos
+          </button>
+        </form>
+      </mat-card>
+
+      @for (sens of [Sens.ALLER, Sens.RETOUR]; track sens) {
+        <mat-card class="carte">
+          <h2>{{ sens === Sens.ALLER ? "Trajet aller" : "Trajet retour" }}</h2>
+          <p class="aide">
+            Pas encore d'horaire précis ? Reviens quand tu veux compléter ou changer cette info, y
+            compris à la dernière minute.
+          </p>
+
+          @if (navetteAssignee(sens); as navette) {
+            <p class="info-navette">
+              🚐 Navette assignée : <strong>{{ navette.libelle }}</strong> — départ à
+              {{ navette.heureDepart }}
+            </p>
+          }
+          @if (statutTrajet(sens) === StatutTrajet.A_REVERIFIER) {
+            <p class="info-reverif">
+              Tes horaires ont changé depuis ton assignation à une navette : l'organisation va
+              revérifier que ça tient toujours.
+            </p>
+          }
+
+          <form [formGroup]="trajetForms[sens]" (ngSubmit)="enregistrerTrajet(sens)">
+            <mat-form-field appearance="outline">
+              <mat-label>Moyen de transport</mat-label>
+              <mat-select formControlName="mode">
+                <mat-option [value]="ModeTransport.TRAIN">Train</mat-option>
+                <mat-option [value]="ModeTransport.COVOITURAGE">Covoiturage</mat-option>
+                <mat-option [value]="ModeTransport.AUTRE">Autre</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            @if (trajetForms[sens].value.mode === ModeTransport.TRAIN) {
+              <mat-form-field appearance="outline">
+                <mat-label>Gare</mat-label>
+                <input matInput formControlName="gare" />
+              </mat-form-field>
+            }
+
+            <mat-form-field appearance="outline">
+              <mat-label>Jour</mat-label>
+              <input matInput type="date" formControlName="jour" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Heure</mat-label>
+              <input matInput type="time" formControlName="heure" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Commentaire</mat-label>
+              <textarea matInput formControlName="commentaire" rows="2"></textarea>
+            </mat-form-field>
+
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="enregistrementTrajet() === sens"
+            >
+              Enregistrer ce trajet
+            </button>
+          </form>
+        </mat-card>
+      }
+    </div>
+  }
+</div>

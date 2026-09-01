@@ -1,0 +1,110 @@
+<div class="entete">
+  <button mat-flat-button color="primary" (click)="afficherFormulaire.set(!afficherFormulaire())">
+    Nouvelle navette
+  </button>
+</div>
+
+@if (afficherFormulaire()) {
+  <form [formGroup]="form" (ngSubmit)="creer()" class="formulaire">
+    <mat-form-field appearance="outline">
+      <mat-label>Libellé</mat-label>
+      <input matInput formControlName="libelle" placeholder="Navette 1 aller vendredi 14h45" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Sens</mat-label>
+      <mat-select formControlName="sens">
+        <mat-option [value]="Sens.ALLER">Aller (vers le lieu)</mat-option>
+        <mat-option [value]="Sens.RETOUR">Retour (vers la gare)</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Jour</mat-label>
+      <input matInput type="date" formControlName="jour" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Conducteur·ice</mat-label>
+      <input matInput formControlName="conducteur" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Véhicule</mat-label>
+      <input matInput formControlName="vehicule" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure de départ (du lieu)</mat-label>
+      <input matInput type="time" formControlName="heureDepart" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure d'arrivée en gare</mat-label>
+      <input matInput type="time" formControlName="heureArriveeGare" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure de retour au lieu (optionnel)</mat-label>
+      <input matInput type="time" formControlName="heureRetourLieu" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Capacité</mat-label>
+      <input matInput type="number" min="1" formControlName="capacite" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="pleine-largeur">
+      <mat-label>Commentaire</mat-label>
+      <textarea matInput formControlName="commentaire" rows="2"></textarea>
+    </mat-form-field>
+    <button mat-flat-button color="primary" type="submit" class="pleine-largeur">Créer la navette</button>
+  </form>
+}
+
+<table mat-table [dataSource]="navettes()" class="tableau">
+  <ng-container matColumnDef="libelle">
+    <th mat-header-cell *matHeaderCellDef>Navette</th>
+    <td mat-cell *matCellDef="let n">{{ n.libelle }}</td>
+  </ng-container>
+  <ng-container matColumnDef="sens">
+    <th mat-header-cell *matHeaderCellDef>Sens</th>
+    <td mat-cell *matCellDef="let n">{{ n.sens === Sens.ALLER ? "Aller" : "Retour" }}</td>
+  </ng-container>
+  <ng-container matColumnDef="jour">
+    <th mat-header-cell *matHeaderCellDef>Jour</th>
+    <td mat-cell *matCellDef="let n">{{ n.jour | date: "d MMM" }}</td>
+  </ng-container>
+  <ng-container matColumnDef="heures">
+    <th mat-header-cell *matHeaderCellDef>Horaires</th>
+    <td mat-cell *matCellDef="let n">{{ n.heureDepart }} → gare {{ n.heureArriveeGare }}</td>
+  </ng-container>
+  <ng-container matColumnDef="places">
+    <th mat-header-cell *matHeaderCellDef>Places restantes</th>
+    <td mat-cell *matCellDef="let n">{{ n.placesRestantes }} / {{ n.capacite }}</td>
+  </ng-container>
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef></th>
+    <td mat-cell *matCellDef="let n">
+      <button mat-button (click)="voirDetail(n.id)">
+        {{ navetteOuverte()?.id === n.id ? "Masquer" : "Voir les passager·es" }}
+      </button>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+  <tr mat-row *matRowDef="let row; columns: colonnes"></tr>
+</table>
+
+@if (navetteOuverte(); as navette) {
+  <div class="detail-passagers">
+    <h3>Passager·es de {{ navette.libelle }}</h3>
+    @if (navette.passagers.length === 0) {
+      <p>Personne d'assigné pour l'instant.</p>
+    } @else {
+      <ul>
+        @for (p of navette.passagers; track p.id) {
+          <li>
+            {{ p.pax.nom }} — {{ p.heure || "heure inconnue" }}
+            @if (p.niveauAttente && p.niveauAttente !== "OK") {
+              <span class="badge-attente" [class.eleve]="p.niveauAttente === 'ELEVE'">
+                attente {{ p.niveauAttente === "ELEVE" ? "élevée" : "moyenne" }}
+              </span>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

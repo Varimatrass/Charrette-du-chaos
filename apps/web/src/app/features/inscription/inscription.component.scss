@@ -1,0 +1,30 @@
+.page {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.carte {
+  max-width: 480px;
+  width: 100%;
+  padding: 1.5rem;
+}
+
+.sous-titre {
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: -0.5rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+.erreur {
+  color: #b3261e;
+}

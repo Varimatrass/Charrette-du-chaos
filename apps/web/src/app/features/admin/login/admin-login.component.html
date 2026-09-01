@@ -1,0 +1,15 @@
+<div class="page">
+  <mat-card class="carte">
+    <h1>Espace organisateur·ice</h1>
+    <form [formGroup]="form" (ngSubmit)="soumettre()">
+      <mat-form-field appearance="outline">
+        <mat-label>Clé d'accès</mat-label>
+        <input matInput type="password" formControlName="cle" required />
+      </mat-form-field>
+      @if (erreur()) {
+        <p class="erreur">{{ erreur() }}</p>
+      }
+      <button mat-flat-button color="primary" type="submit" [disabled]="enCours()">Entrer</button>
+    </form>
+  </mat-card>
+</div>

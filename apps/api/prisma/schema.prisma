@@ -1,0 +1,118 @@
+// Schéma Prisma — Le Désordre / Navettes
+// Après avoir cloné le projet et renseigné DATABASE_URL dans apps/api/.env,
+// lance `pnpm prisma:generate` puis `pnpm prisma:migrate` depuis la racine.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Sens {
+  ALLER
+  RETOUR
+}
+
+enum ModeTransport {
+  TRAIN
+  COVOITURAGE
+  AUTRE
+}
+
+enum StatutTrajet {
+  EN_ATTENTE
+  ASSIGNE
+  A_REVERIFIER
+}
+
+model Edition {
+  id            String   @id @default(uuid())
+  nom           String
+  dateDebut     DateTime @map("date_debut") @db.Date
+  dateFin       DateTime @map("date_fin") @db.Date
+  lieu          String
+  gareReference String   @map("gare_reference")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  paxs     Pax[]
+  navettes Navette[]
+  trajets  Trajet[]
+
+  @@map("editions")
+}
+
+model Pax {
+  id               String   @id @default(uuid())
+  editionId        String   @map("edition_id")
+  nom              String
+  contactEmail     String?  @map("contact_email")
+  contactTelephone String?  @map("contact_telephone")
+  commentaire      String?
+  // Jeton d'accès personnel non devinable : c'est ce qui permet à un pax
+  // de revenir modifier ses infos sans compte. Ne jamais l'exposer dans les
+  // vues publiques/listes, seulement dans la réponse de création et le
+  // back-office organisateur·ice.
+  accessToken      String   @unique @default(uuid()) @map("access_token")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  trajets Trajet[]
+
+  @@index([editionId])
+  @@map("paxs")
+}
+
+model Navette {
+  id               String   @id @default(uuid())
+  editionId        String   @map("edition_id")
+  libelle          String
+  jour             DateTime @db.Date
+  sens             Sens
+  conducteur       String?
+  vehicule         String?
+  heureDepart      String   @map("heure_depart") // "HH:mm"
+  heureArriveeGare String   @map("heure_arrivee_gare") // "HH:mm"
+  heureRetourLieu  String?  @map("heure_retour_lieu") // "HH:mm"
+  capacite         Int
+  commentaire      String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  trajets Trajet[]
+
+  @@index([editionId])
+  @@map("navettes")
+}
+
+model Trajet {
+  id          String        @id @default(uuid())
+  editionId   String        @map("edition_id")
+  paxId       String        @map("pax_id")
+  sens        Sens
+  mode        ModeTransport
+  jour        DateTime?     @db.Date
+  heure       String? // "HH:mm"
+  gare        String?
+  navetteId   String?       @map("navette_id")
+  statut      StatutTrajet  @default(EN_ATTENTE)
+  commentaire String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
+  navette Navette? @relation(fields: [navetteId], references: [id], onDelete: SetNull)
+
+  // Un pax n'a qu'un seul trajet par sens (aller / retour) et par édition.
+  // Il reste librement modifiable, jamais dupliqué.
+  @@unique([paxId, sens])
+  @@index([editionId])
+  @@index([navetteId])
+  @@map("trajets")
+}

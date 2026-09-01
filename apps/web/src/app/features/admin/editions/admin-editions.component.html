@@ -1,0 +1,48 @@
+<div class="page">
+  <div class="entete">
+    <h1>Éditions</h1>
+    <button mat-flat-button color="primary" (click)="afficherFormulaire.set(!afficherFormulaire())">
+      Nouvelle édition
+    </button>
+  </div>
+
+  @if (afficherFormulaire()) {
+    <mat-card class="carte">
+      <form [formGroup]="form" (ngSubmit)="creer()">
+        <mat-form-field appearance="outline">
+          <mat-label>Nom</mat-label>
+          <input matInput formControlName="nom" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Date de début</mat-label>
+          <input matInput type="date" formControlName="dateDebut" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Date de fin</mat-label>
+          <input matInput type="date" formControlName="dateFin" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Lieu</mat-label>
+          <input matInput formControlName="lieu" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Gare de référence</mat-label>
+          <input matInput formControlName="gareReference" required />
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit">Créer</button>
+      </form>
+    </mat-card>
+  }
+
+  <mat-nav-list>
+    @for (edition of editions(); track edition.id) {
+      <a mat-list-item [routerLink]="['/admin/editions', edition.id]">
+        <span matListItemTitle>{{ edition.nom }}</span>
+        <span matListItemLine
+          >{{ edition.dateDebut | date: "d MMM yyyy" }} → {{ edition.dateFin | date: "d MMM yyyy" }} —
+          {{ edition.lieu }}</span
+        >
+      </a>
+    }
+  </mat-nav-list>
+</div>

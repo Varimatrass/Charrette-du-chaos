@@ -1,0 +1,74 @@
+<mat-button-toggle-group [value]="filtreStatut()" (change)="changerFiltre($event.value)">
+  <mat-button-toggle [value]="null">Tous</mat-button-toggle>
+  <mat-button-toggle [value]="StatutTrajet.EN_ATTENTE">En attente</mat-button-toggle>
+  <mat-button-toggle [value]="StatutTrajet.ASSIGNE">Assignés</mat-button-toggle>
+  <mat-button-toggle [value]="StatutTrajet.A_REVERIFIER">À revérifier</mat-button-toggle>
+</mat-button-toggle-group>
+
+<table mat-table [dataSource]="trajets()" class="tableau">
+  <ng-container matColumnDef="pax">
+    <th mat-header-cell *matHeaderCellDef>Pax</th>
+    <td mat-cell *matCellDef="let t">{{ t.pax.nom }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="sens">
+    <th mat-header-cell *matHeaderCellDef>Sens</th>
+    <td mat-cell *matCellDef="let t">{{ t.sens === Sens.ALLER ? "Aller" : "Retour" }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="mode">
+    <th mat-header-cell *matHeaderCellDef>Mode</th>
+    <td mat-cell *matCellDef="let t">{{ t.mode }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="quand">
+    <th mat-header-cell *matHeaderCellDef>Jour / heure</th>
+    <td mat-cell *matCellDef="let t">
+      {{ t.jour ? (t.jour | date: "d MMM") : "?" }} {{ t.heure || "" }}
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="attente">
+    <th mat-header-cell *matHeaderCellDef>Attente</th>
+    <td mat-cell *matCellDef="let t">
+      @if (t.niveauAttente && t.niveauAttente !== "OK") {
+        <mat-chip [class.eleve]="t.niveauAttente === 'ELEVE'">
+          {{ t.niveauAttente === "ELEVE" ? "élevée" : "moyenne" }}
+        </mat-chip>
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="statut">
+    <th mat-header-cell *matHeaderCellDef>Statut</th>
+    <td mat-cell *matCellDef="let t">
+      <mat-chip [class.a-reverifier]="t.statut === StatutTrajet.A_REVERIFIER">{{ t.statut }}</mat-chip>
+      @if (t.statut === StatutTrajet.A_REVERIFIER) {
+        <button mat-button (click)="marquerVerifie(t)">Marquer vérifié</button>
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="navette">
+    <th mat-header-cell *matHeaderCellDef>Navette assignée</th>
+    <td mat-cell *matCellDef="let t">
+      <mat-select
+        [value]="t.navetteId"
+        (selectionChange)="assigner(t, $event.value)"
+        placeholder="Aucune"
+      >
+        <mat-option [value]="null">Aucune</mat-option>
+        @for (n of navettesCompatibles(t); track n.id) {
+          <mat-option [value]="n.id">{{ n.libelle }}</mat-option>
+        }
+      </mat-select>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="colonnes"></tr>
+  <tr mat-row *matRowDef="let row; columns: colonnes"></tr>
+</table>
+
+@if (trajets().length === 0) {
+  <p class="vide">Aucun trajet pour ce filtre.</p>
+}

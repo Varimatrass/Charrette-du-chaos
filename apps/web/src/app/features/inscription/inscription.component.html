@@ -1,0 +1,50 @@
+<div class="page">
+  <mat-card class="carte">
+    @if (edition(); as e) {
+      <h1>{{ e.nom }}</h1>
+      <p class="sous-titre">
+        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} — {{ e.lieu }}
+      </p>
+    }
+
+    <h2>Inscription transport</h2>
+    <p>
+      Indique tes infos ci-dessous. Tu pourras revenir modifier ou compléter tes trajets aussi
+      souvent que nécessaire grâce au lien personnel qui te sera donné juste après.
+    </p>
+
+    @if (erreur()) {
+      <p class="erreur">{{ erreur() }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="soumettre()">
+      <mat-form-field appearance="outline">
+        <mat-label>Ton nom (le même que sur le Discord si possible)</mat-label>
+        <input matInput formControlName="nom" required />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Email (optionnel)</mat-label>
+        <input matInput type="email" formControlName="contactEmail" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Téléphone (optionnel)</mat-label>
+        <input matInput formControlName="contactTelephone" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Commentaire (optionnel)</mat-label>
+        <textarea matInput formControlName="commentaire" rows="2"></textarea>
+      </mat-form-field>
+
+      <button mat-flat-button color="primary" type="submit" [disabled]="enCours()">
+        @if (enCours()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          Continuer
+        }
+      </button>
+    </form>
+  </mat-card>
+</div>

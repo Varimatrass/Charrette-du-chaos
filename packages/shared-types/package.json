@@ -1,0 +1,15 @@
+{
+  "name": "@desordre/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types et interfaces partagés entre le frontend (Angular) et le backend (NestJS)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

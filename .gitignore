@@ -1,0 +1,20 @@
+# Dépendances
+node_modules/
+
+# Builds
+dist/
+.angular/
+
+# Environnement
+.env
+.env.*
+!.env.example
+
+# Prisma
+apps/api/prisma/migrations/dev.db
+
+# Logs / éditeurs
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

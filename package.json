@@ -1,0 +1,28 @@
+{
+  "name": "desordre-navettes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Gestion des navettes (et bientôt du covoiturage) pour les évènements Le Désordre",
+  "scripts": {
+    "prepare": "pnpm --filter @desordre/shared-types run build",
+    "dev:api": "pnpm --filter @desordre/api run start:dev",
+    "dev:web": "pnpm --filter @desordre/web run start",
+    "build": "pnpm --filter @desordre/shared-types run build && pnpm --filter @desordre/api run build && pnpm --filter @desordre/web run build",
+    "prisma:generate": "pnpm --filter @desordre/api exec prisma generate",
+    "prisma:migrate": "pnpm --filter @desordre/api exec prisma migrate dev",
+    "prisma:studio": "pnpm --filter @desordre/api exec prisma studio"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "lmdb",
+      "msgpackr-extract",
+      "unrs-resolver",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  }
+}
