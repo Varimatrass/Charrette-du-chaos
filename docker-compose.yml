@@ -1,0 +1,72 @@
+# Environnement de dev local — fonctionne avec `docker compose` ou
+# `podman compose` (voir README pour Podman). La base de données tourne
+# toujours ici, jamais installée "à la main" sur la machine.
+#
+# Deux façons de l'utiliser :
+#   1. Tout en conteneurs :        docker compose up
+#   2. Juste la base, le reste en natif (plus rapide à itérer) :
+#         docker compose up -d db
+#         pnpm dev:api   /   pnpm dev:web
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-charrette}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-charrette}
+      POSTGRES_DB: ${POSTGRES_DB:-charrette_du_chaos}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-charrette}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - apps/api/.env
+    environment:
+      # Écrase la valeur de apps/api/.env : à l'intérieur du réseau Docker,
+      # la base s'appelle "db", pas "localhost".
+      DATABASE_URL: postgresql://${POSTGRES_USER:-charrette}:${POSTGRES_PASSWORD:-charrette}@db:5432/${POSTGRES_DB:-charrette_du_chaos}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace
+      # Ces volumes anonymes empêchent le bind mount ci-dessus d'écraser les
+      # node_modules installés dans l'image (le hôte n'a pas forcément les
+      # mêmes binaires natifs compilés).
+      - /workspace/node_modules
+      - /workspace/apps/api/node_modules
+      - /workspace/apps/web/node_modules
+      - /workspace/packages/shared-types/node_modules
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "4200:4200"
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
+      - /workspace/apps/api/node_modules
+      - /workspace/apps/web/node_modules
+      - /workspace/packages/shared-types/node_modules
+
+volumes:
+  pgdata:

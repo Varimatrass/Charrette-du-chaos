@@ -1,8 +1,8 @@
 {
-  "name": "desordre-navettes",
+  "name": "charrette-du-chaos",
   "private": true,
   "version": "0.1.0",
-  "description": "Gestion des navettes (et bientôt du covoiturage) pour les évènements Le Désordre",
+  "description": "Charrette du Chaos — gestion des navettes (et bientôt du covoiturage) pour les évènements en autogestion",
   "scripts": {
     "prepare": "pnpm --filter @desordre/shared-types run build",
     "dev:api": "pnpm --filter @desordre/api run start:dev",

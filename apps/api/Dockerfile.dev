@@ -1,0 +1,30 @@
+# Image de dev pour l'API NestJS — pas destinée à la prod (voir Dockerfile
+# séparé le jour où on prépare un vrai déploiement).
+FROM node:22-bookworm-slim AS base
+RUN corepack enable
+WORKDIR /workspace
+
+FROM base AS deps
+# Outils de compilation pour les rares dépendances natives sans binaire
+# précompilé pour cette plateforme (filet de sécurité, coûte peu).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+# On ne copie que les package.json d'abord pour profiter du cache Docker :
+# tant que les dépendances ne changent pas, cette étape n'est pas rejouée.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/shared-types/package.json packages/shared-types/package.json
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS dev
+COPY . .
+RUN pnpm --filter @desordre/shared-types run build
+EXPOSE 3000
+# Le bind mount du docker-compose remplace ce dossier par celui de ton hôte
+# au démarrage du conteneur (pratique pour le rechargement à chaud), donc on
+# reconstruit shared-types à chaque lancement pour être sûr d'avoir la
+# dernière version, même si tu l'as modifié entre-temps.
+CMD ["sh", "-c", "pnpm --filter @desordre/shared-types run build && pnpm --filter @desordre/api run start:dev"]
