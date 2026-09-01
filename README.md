@@ -82,6 +82,22 @@ environnement cloud pour préparer ce scaffolding (réseau restreint côté
 sandbox), donc c'est la première vraie exécution chez toi — dis-moi si
 quelque chose coince.
 
+### Où vit la configuration de connexion (Prisma 7)
+
+Depuis Prisma 7, l'URL de connexion (`DATABASE_URL`) ne se met plus
+directement dans `schema.prisma` — c'est un changement de Prisma lui-même,
+pas une particularité de ce projet. Elle vit maintenant à deux endroits :
+
+- **`apps/api/prisma.config.ts`** — lu uniquement par le CLI (`prisma:generate`,
+  `prisma:migrate`, `prisma:studio`).
+- **`apps/api/src/prisma/prisma.service.ts`** — un "adapter" Postgres
+  (`@prisma/adapter-pg`) construit avec `DATABASE_URL`, utilisé par l'API au
+  démarrage.
+
+Tu n'as rien à faire de spécial pour ça : les deux lisent la même variable
+`DATABASE_URL` de ton `.env`, c'est juste pour comprendre pourquoi elle
+apparaît à deux endroits dans le code si jamais tu regardes.
+
 ## Lancer en développement
 
 ### Option A — tout en conteneurs (recommandé, rien à installer d'autre)

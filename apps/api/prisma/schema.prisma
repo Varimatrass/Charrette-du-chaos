@@ -6,9 +6,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Depuis Prisma 7, l'URL de connexion ne se met plus ici : elle est lue
+// depuis DATABASE_URL par prisma.config.ts (pour le CLI : generate/migrate)
+// et par l'adapter passé à PrismaClient dans prisma.service.ts (à l'exécution).
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Sens {
