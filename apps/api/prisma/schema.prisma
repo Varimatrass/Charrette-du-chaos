@@ -30,7 +30,7 @@ enum StatutTrajet {
   A_REVERIFIER
 }
 
-model Edition {
+model Event {
   id            String   @id @default(uuid())
   nom           String
   dateDebut     DateTime @map("date_debut") @db.Date
@@ -44,12 +44,12 @@ model Edition {
   navettes Navette[]
   trajets  Trajet[]
 
-  @@map("editions")
+  @@map("events")
 }
 
 model Pax {
   id               String   @id @default(uuid())
-  editionId        String   @map("edition_id")
+  eventId          String   @map("event_id")
   nom              String
   contactEmail     String?  @map("contact_email")
   contactTelephone String?  @map("contact_telephone")
@@ -62,16 +62,16 @@ model Pax {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   trajets Trajet[]
 
-  @@index([editionId])
+  @@index([eventId])
   @@map("paxs")
 }
 
 model Navette {
   id               String   @id @default(uuid())
-  editionId        String   @map("edition_id")
+  eventId          String   @map("event_id")
   libelle          String
   jour             DateTime @db.Date
   sens             Sens
@@ -85,16 +85,16 @@ model Navette {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   trajets Trajet[]
 
-  @@index([editionId])
+  @@index([eventId])
   @@map("navettes")
 }
 
 model Trajet {
   id          String        @id @default(uuid())
-  editionId   String        @map("edition_id")
+  eventId     String        @map("event_id")
   paxId       String        @map("pax_id")
   sens        Sens
   mode        ModeTransport
@@ -107,14 +107,14 @@ model Trajet {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
-  edition Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
   navette Navette? @relation(fields: [navetteId], references: [id], onDelete: SetNull)
 
-  // Un pax n'a qu'un seul trajet par sens (aller / retour) et par édition.
+  // Un pax n'a qu'un seul trajet par sens (aller / retour) et par évènement.
   // Il reste librement modifiable, jamais dupliqué.
   @@unique([paxId, sens])
-  @@index([editionId])
+  @@index([eventId])
   @@index([navetteId])
   @@map("trajets")
 }

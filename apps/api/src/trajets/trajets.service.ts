@@ -36,7 +36,7 @@ export class TrajetsService {
         data: {
           ...donneesCommunes,
           sens,
-          editionId: pax.editionId,
+          eventId: pax.eventId,
           paxId: pax.id,
           statut: StatutTrajet.EN_ATTENTE,
         },
@@ -51,16 +51,23 @@ export class TrajetsService {
     });
   }
 
-  async findAllForEdition(editionId: string, statut?: StatutTrajet) {
+  async findAllForEvent(eventId: string, statut?: StatutTrajet) {
     const trajets = await this.prisma.trajet.findMany({
-      where: { editionId, ...(statut && { statut }) },
+      where: { eventId, ...(statut && { statut }) },
       include: { pax: true, navette: true },
       orderBy: [{ jour: "asc" }, { heure: "asc" }],
     });
 
     return trajets.map(({ navette, ...trajet }) => ({
       ...trajet,
-      niveauAttente: navette ? calculerNiveauAttente(trajet.sens, trajet.heure, navette.heureArriveeGare) : null,
+      niveauAttente: navette ? calculerNiveauAttente(
+          // Le client Prisma génère son propre enum `Sens` (structurellement identique
+          // à celui de shared-types mais nominalement distinct pour TypeScript) : cast
+          // sûr car les valeurs viennent du même schéma Prisma qui définit "ALLER"/"RETOUR".
+          trajet.sens as unknown as Sens,
+          trajet.heure,
+          navette.heureArriveeGare,
+        ) : null,
     }));
   }
 

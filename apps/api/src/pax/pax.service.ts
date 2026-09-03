@@ -16,7 +16,7 @@ export class PaxService {
   async create(dto: CreatePaxDto): Promise<PaxSubmissionResult> {
     const pax = await this.prisma.pax.create({
       data: {
-        editionId: dto.editionId,
+        eventId: dto.eventId,
         nom: dto.nom,
         contactEmail: dto.contactEmail,
         contactTelephone: dto.contactTelephone,
@@ -56,17 +56,17 @@ export class PaxService {
     return rest;
   }
 
-  findAllForEdition(editionId: string) {
+  findAllForEvent(eventId: string) {
     return this.prisma.pax.findMany({
-      where: { editionId },
+      where: { eventId },
       orderBy: { nom: "asc" },
     });
   }
 
-  async rechercher(editionId: string, nom: string) {
+  async rechercher(eventId: string, nom: string) {
     return this.prisma.pax.findMany({
       where: {
-        editionId,
+        eventId,
         nom: { contains: nom, mode: "insensitive" },
       },
       orderBy: { nom: "asc" },

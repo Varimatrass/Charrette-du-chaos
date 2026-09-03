@@ -1,8 +1,8 @@
 import { ModeTransport, Sens, StatutTrajet } from "./enums";
 
-// ---- Édition ----
+// ---- Évènement ----
 
-export interface CreateEditionInput {
+export interface CreateEventInput {
   nom: string;
   dateDebut: string;
   dateFin: string;
@@ -10,7 +10,7 @@ export interface CreateEditionInput {
   gareReference: string;
 }
 
-export type UpdateEditionInput = Partial<CreateEditionInput>;
+export type UpdateEventInput = Partial<CreateEventInput>;
 
 // ---- Pax (auto-inscription, sans compte) ----
 
@@ -19,14 +19,14 @@ export type UpdateEditionInput = Partial<CreateEditionInput>;
  * personnel (voir PaxSubmissionResult).
  */
 export interface CreatePaxInput {
-  editionId: string;
+  eventId: string;
   nom: string;
   contactEmail?: string;
   contactTelephone?: string;
   commentaire?: string;
 }
 
-export type UpdatePaxInput = Partial<Omit<CreatePaxInput, "editionId">>;
+export type UpdatePaxInput = Partial<Omit<CreatePaxInput, "eventId">>;
 
 /** Renvoyé une seule fois, juste après la création du pax. */
 export interface PaxSubmissionResult {
@@ -61,7 +61,7 @@ export interface SetStatutTrajetInput {
 // ---- Navette ----
 
 export interface CreateNavetteInput {
-  editionId: string;
+  eventId: string;
   libelle: string;
   jour: string;
   sens: Sens;
@@ -74,11 +74,11 @@ export interface CreateNavetteInput {
   commentaire?: string;
 }
 
-export type UpdateNavetteInput = Partial<Omit<CreateNavetteInput, "editionId">>;
+export type UpdateNavetteInput = Partial<Omit<CreateNavetteInput, "eventId">>;
 
 // ---- Recherche / lookup admin ----
 
 export interface RechercherPaxQuery {
-  editionId: string;
+  eventId: string;
   nom: string;
 }

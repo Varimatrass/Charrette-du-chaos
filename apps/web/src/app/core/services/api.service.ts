@@ -3,10 +3,10 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import type {
   AssignerTrajetInput,
-  CreateEditionInput,
+  CreateEventInput,
   CreateNavetteInput,
   CreatePaxInput,
-  Edition,
+  Event,
   Navette,
   NavetteAvecPassagers,
   Pax,
@@ -16,7 +16,7 @@ import type {
   StatutTrajet,
   Trajet,
   TrajetAvecPax,
-  UpdateEditionInput,
+  UpdateEventInput,
   UpdateNavetteInput,
   UpdatePaxInput,
 } from "@desordre/shared-types";
@@ -33,22 +33,22 @@ export class ApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  // ---- Éditions ----
+  // ---- Évènements ----
 
-  listerEditions(): Observable<Edition[]> {
-    return this.http.get<Edition[]>(`${this.base}/editions`);
+  listerEvents(): Observable<Event[]> {
+    return this.http.get<Event[]>(`${this.base}/events`);
   }
 
-  recupererEdition(id: string): Observable<Edition> {
-    return this.http.get<Edition>(`${this.base}/editions/${id}`);
+  recupererEvent(id: string): Observable<Event> {
+    return this.http.get<Event>(`${this.base}/events/${id}`);
   }
 
-  creerEdition(input: CreateEditionInput): Observable<Edition> {
-    return this.http.post<Edition>(`${this.base}/editions`, input);
+  creerEvent(input: CreateEventInput): Observable<Event> {
+    return this.http.post<Event>(`${this.base}/admin/events`, input);
   }
 
-  modifierEdition(id: string, input: UpdateEditionInput): Observable<Edition> {
-    return this.http.patch<Edition>(`${this.base}/editions/${id}`, input);
+  modifierEvent(id: string, input: UpdateEventInput): Observable<Event> {
+    return this.http.patch<Event>(`${this.base}/admin/events/${id}`, input);
   }
 
   // ---- Pax (self-service) ----
@@ -81,21 +81,21 @@ export class ApiService {
 
   // ---- Pax (back-office) ----
 
-  listerPaxsEdition(editionId: string): Observable<PaxAdmin[]> {
-    return this.http.get<PaxAdmin[]>(`${this.base}/admin/pax`, { params: { editionId } });
+  listerPaxsEvent(eventId: string): Observable<PaxAdmin[]> {
+    return this.http.get<PaxAdmin[]>(`${this.base}/admin/pax`, { params: { eventId } });
   }
 
-  rechercherPax(editionId: string, nom: string): Observable<PaxAdmin[]> {
+  rechercherPax(eventId: string, nom: string): Observable<PaxAdmin[]> {
     return this.http.get<PaxAdmin[]>(`${this.base}/admin/pax/rechercher`, {
-      params: { editionId, nom },
+      params: { eventId, nom },
     });
   }
 
   // ---- Navettes (back-office) ----
 
-  listerNavettes(editionId: string): Observable<(Navette & { placesRestantes: number })[]> {
+  listerNavettes(eventId: string): Observable<(Navette & { placesRestantes: number })[]> {
     return this.http.get<(Navette & { placesRestantes: number })[]>(`${this.base}/admin/navettes`, {
-      params: { editionId },
+      params: { eventId },
     });
   }
 
@@ -113,9 +113,9 @@ export class ApiService {
 
   // ---- Trajets (back-office) ----
 
-  listerTrajets(editionId: string, statut?: StatutTrajet): Observable<TrajetAvecPax[]> {
+  listerTrajets(eventId: string, statut?: StatutTrajet): Observable<TrajetAvecPax[]> {
     return this.http.get<TrajetAvecPax[]>(`${this.base}/admin/trajets`, {
-      params: statut ? { editionId, statut } : { editionId },
+      params: statut ? { eventId, statut } : { eventId },
     });
   }
 

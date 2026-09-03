@@ -1,8 +1,8 @@
 <div class="page">
   <div class="entete">
-    <h1>Éditions</h1>
+    <h1>Évènements</h1>
     <button mat-flat-button color="primary" (click)="afficherFormulaire.set(!afficherFormulaire())">
-      Nouvelle édition
+      Nouvel évènement
     </button>
   </div>
 
@@ -35,12 +35,12 @@
   }
 
   <mat-nav-list>
-    @for (edition of editions(); track edition.id) {
-      <a mat-list-item [routerLink]="['/admin/editions', edition.id]">
-        <span matListItemTitle>{{ edition.nom }}</span>
+    @for (event of events(); track event.id) {
+      <a mat-list-item [routerLink]="['/admin/events', event.id]">
+        <span matListItemTitle>{{ event.nom }}</span>
         <span matListItemLine
-          >{{ edition.dateDebut | date: "d MMM yyyy" }} → {{ edition.dateFin | date: "d MMM yyyy" }} —
-          {{ edition.lieu }}</span
+          >{{ event.dateDebut | date: "d MMM yyyy" }} → {{ event.dateFin | date: "d MMM yyyy" }} —
+          {{ event.lieu }}</span
         >
       </a>
     }

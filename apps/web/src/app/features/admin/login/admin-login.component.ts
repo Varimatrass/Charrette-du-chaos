@@ -39,7 +39,7 @@ export class AdminLoginComponent {
     // On vérifie la clé sur une route admin quelconque : 200 = valide, 401 = refusée.
     this.http
       .get(`${environment.apiUrl}/admin/pax`, {
-        params: { editionId: "verification" },
+        params: { eventId: "verification" },
         headers: { "x-admin-key": cle },
       })
       .pipe(catchError(() => of(null)))

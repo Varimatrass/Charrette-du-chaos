@@ -26,7 +26,7 @@ import { ApiService } from "../../../../core/services/api.service";
   styleUrl: "./navettes-tab.component.scss",
 })
 export class NavettesTabComponent implements OnChanges {
-  readonly editionId = input.required<string>();
+  readonly eventId = input.required<string>();
 
   private readonly api = inject(ApiService);
 
@@ -54,7 +54,7 @@ export class NavettesTabComponent implements OnChanges {
   }
 
   charger(): void {
-    this.api.listerNavettes(this.editionId()).subscribe((navettes) => this.navettes.set(navettes));
+    this.api.listerNavettes(this.eventId()).subscribe((navettes) => this.navettes.set(navettes));
   }
 
   creer(): void {
@@ -65,7 +65,7 @@ export class NavettesTabComponent implements OnChanges {
     const valeurs = this.form.getRawValue();
     this.api
       .creerNavette({
-        editionId: this.editionId(),
+        eventId: this.eventId(),
         libelle: valeurs.libelle,
         sens: valeurs.sens,
         jour: valeurs.jour,

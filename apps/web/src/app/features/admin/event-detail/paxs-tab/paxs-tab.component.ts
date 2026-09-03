@@ -25,7 +25,7 @@ import { ApiService } from "../../../../core/services/api.service";
   styleUrl: "./paxs-tab.component.scss",
 })
 export class PaxsTabComponent implements OnChanges {
-  readonly editionId = input.required<string>();
+  readonly eventId = input.required<string>();
 
   private readonly api = inject(ApiService);
   private readonly snackBar = inject(MatSnackBar);
@@ -43,7 +43,7 @@ export class PaxsTabComponent implements OnChanges {
   }
 
   charger(): void {
-    this.api.listerPaxsEdition(this.editionId()).subscribe((paxs) => this.paxs.set(paxs));
+    this.api.listerPaxsEvent(this.eventId()).subscribe((paxs) => this.paxs.set(paxs));
   }
 
   rechercher(): void {
@@ -52,7 +52,7 @@ export class PaxsTabComponent implements OnChanges {
       this.charger();
       return;
     }
-    this.api.rechercherPax(this.editionId(), nom).subscribe((paxs) => this.paxs.set(paxs));
+    this.api.rechercherPax(this.eventId(), nom).subscribe((paxs) => this.paxs.set(paxs));
   }
 
   basculerLien(paxId: string): void {

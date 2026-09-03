@@ -35,8 +35,8 @@ export class TrajetsController {
 
   @UseGuards(AdminGuard)
   @Get("admin/trajets")
-  findAllForEdition(@Query("editionId") editionId: string, @Query("statut") statut?: StatutTrajet) {
-    return this.trajetsService.findAllForEdition(editionId, statut);
+  findAllForEvent(@Query("eventId") eventId: string, @Query("statut") statut?: StatutTrajet) {
+    return this.trajetsService.findAllForEvent(eventId, statut);
   }
 
   @UseGuards(AdminGuard)

@@ -4,7 +4,7 @@ import type { CreateNavetteInput } from "@desordre/shared-types";
 
 export class CreateNavetteDto implements CreateNavetteInput {
   @IsUUID()
-  editionId!: string;
+  eventId!: string;
 
   @IsString()
   @IsNotEmpty()

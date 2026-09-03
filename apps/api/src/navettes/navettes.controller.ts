@@ -16,8 +16,8 @@ export class NavettesController {
   }
 
   @Get()
-  findAllForEdition(@Query("editionId") editionId: string) {
-    return this.navettesService.findAllForEdition(editionId);
+  findAllForEvent(@Query("eventId") eventId: string) {
+    return this.navettesService.findAllForEvent(eventId);
   }
 
   @Get(":id")

@@ -12,7 +12,7 @@ import { PaxService } from "./pax.service";
 export class PaxController {
   constructor(private readonly paxService: PaxService) {}
 
-  /** Première saisie, publique : n'importe qui avec le lien de l'édition peut s'inscrire. */
+  /** Première saisie, publique : n'importe qui avec le lien de l'évènement peut s'inscrire. */
   @Post("pax")
   create(@Body() dto: CreatePaxDto) {
     return this.paxService.create(dto);
@@ -31,18 +31,18 @@ export class PaxController {
     return this.paxService.update(pax, dto);
   }
 
-  /** Back-office : liste des paxs d'une édition (inclut le jeton, pour renvoyer un lien perdu). */
+  /** Back-office : liste des paxs d'un évènement (inclut le jeton, pour renvoyer un lien perdu). */
   @UseGuards(AdminGuard)
   @Get("admin/pax")
-  findAllForEdition(@Query("editionId") editionId: string) {
-    return this.paxService.findAllForEdition(editionId);
+  findAllForEvent(@Query("eventId") eventId: string) {
+    return this.paxService.findAllForEvent(eventId);
   }
 
   /** Back-office : retrouver un pax par nom pour lui repartager son lien perdu. */
   @UseGuards(AdminGuard)
   @Get("admin/pax/rechercher")
   rechercher(@Query() query: RechercherPaxDto) {
-    return this.paxService.rechercher(query.editionId, query.nom);
+    return this.paxService.rechercher(query.eventId, query.nom);
   }
 
   @UseGuards(AdminGuard)

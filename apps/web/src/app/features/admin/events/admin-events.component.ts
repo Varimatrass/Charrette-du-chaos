@@ -7,11 +7,11 @@ import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatListModule } from "@angular/material/list";
-import type { Edition } from "@desordre/shared-types";
+import type { Event } from "@desordre/shared-types";
 import { ApiService } from "../../../core/services/api.service";
 
 @Component({
-  selector: "app-admin-editions",
+  selector: "app-admin-events",
   standalone: true,
   imports: [
     DatePipe,
@@ -23,13 +23,13 @@ import { ApiService } from "../../../core/services/api.service";
     MatInputModule,
     MatListModule,
   ],
-  templateUrl: "./admin-editions.component.html",
-  styleUrl: "./admin-editions.component.scss",
+  templateUrl: "./admin-events.component.html",
+  styleUrl: "./admin-events.component.scss",
 })
-export class AdminEditionsComponent {
+export class AdminEventsComponent {
   private readonly api = inject(ApiService);
 
-  readonly editions = signal<Edition[]>([]);
+  readonly events = signal<Event[]>([]);
   readonly afficherFormulaire = signal(false);
 
   readonly form = new FormGroup({
@@ -45,7 +45,7 @@ export class AdminEditionsComponent {
   }
 
   private charger(): void {
-    this.api.listerEditions().subscribe((editions) => this.editions.set(editions));
+    this.api.listerEvents().subscribe((events) => this.events.set(events));
   }
 
   creer(): void {
@@ -53,7 +53,7 @@ export class AdminEditionsComponent {
       this.form.markAllAsTouched();
       return;
     }
-    this.api.creerEdition(this.form.getRawValue()).subscribe(() => {
+    this.api.creerEvent(this.form.getRawValue()).subscribe(() => {
       this.form.reset();
       this.afficherFormulaire.set(false);
       this.charger();

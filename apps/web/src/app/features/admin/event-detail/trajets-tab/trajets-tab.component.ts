@@ -28,7 +28,7 @@ import { ApiService } from "../../../../core/services/api.service";
   styleUrl: "./trajets-tab.component.scss",
 })
 export class TrajetsTabComponent implements OnChanges {
-  readonly editionId = input.required<string>();
+  readonly eventId = input.required<string>();
 
   private readonly api = inject(ApiService);
   private readonly snackBar = inject(MatSnackBar);
@@ -43,12 +43,12 @@ export class TrajetsTabComponent implements OnChanges {
 
   ngOnChanges(): void {
     this.charger();
-    this.api.listerNavettes(this.editionId()).subscribe((navettes) => this.navettes.set(navettes));
+    this.api.listerNavettes(this.eventId()).subscribe((navettes) => this.navettes.set(navettes));
   }
 
   charger(): void {
     this.api
-      .listerTrajets(this.editionId(), this.filtreStatut() ?? undefined)
+      .listerTrajets(this.eventId(), this.filtreStatut() ?? undefined)
       .subscribe((trajets) => this.trajets.set(trajets));
   }
 

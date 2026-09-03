@@ -153,16 +153,16 @@ deux cas : elle tourne toujours en conteneur.
 > nativement sous Linux. Si jamais ça ne réagit pas après une modif, ajoute
 > `--poll 2000` à la commande `pnpm run start` dans `apps/web/Dockerfile.dev`.
 
-## Créer une édition et tester le parcours
+## Créer un évènement et tester le parcours
 
 1. Va sur `http://localhost:4200/admin/connexion`, entre la valeur de `ADMIN_KEY`.
-2. Crée une édition (nom, dates, lieu, gare de référence).
-3. Le formulaire pax public est sur `http://localhost:4200/e/<id-de-l-edition>`
+2. Crée un évènement (nom, dates, lieu, gare de référence).
+3. Le formulaire pax public est sur `http://localhost:4200/e/<id-de-l-evenement>`
    — c'est ce lien qu'on partage aux paxs avant l'évènement.
 4. Une fois inscrit·e, le pax atterrit sur `/mon-espace/<jeton>` : c'est son
    lien personnel, à garder pour revenir modifier ses trajets aller/retour
    quand il veut, sans jamais être bloqué.
-5. Dans le back-office (`/admin/editions/<id>`), onglet **Navettes**, crée les
+5. Dans le back-office (`/admin/events/<id>`), onglet **Navettes**, crée les
    créneaux ; onglet **Trajets / demandes**, assigne chaque pax à une navette
    via le menu déroulant.
 

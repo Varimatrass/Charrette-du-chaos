@@ -4,7 +4,7 @@ import { adminGuard } from "./core/guards/admin.guard";
 export const routes: Routes = [
   { path: "", redirectTo: "admin", pathMatch: "full" },
   {
-    path: "e/:editionId",
+    path: "e/:eventId",
     loadComponent: () =>
       import("./features/inscription/inscription.component").then((m) => m.InscriptionComponent),
   },
@@ -22,14 +22,14 @@ export const routes: Routes = [
     path: "admin",
     canActivate: [adminGuard],
     loadComponent: () =>
-      import("./features/admin/editions/admin-editions.component").then((m) => m.AdminEditionsComponent),
+      import("./features/admin/events/admin-events.component").then((m) => m.AdminEventsComponent),
   },
   {
-    path: "admin/editions/:id",
+    path: "admin/events/:id",
     canActivate: [adminGuard],
     loadComponent: () =>
-      import("./features/admin/edition-detail/admin-edition-detail.component").then(
-        (m) => m.AdminEditionDetailComponent,
+      import("./features/admin/event-detail/admin-event-detail.component").then(
+        (m) => m.AdminEventDetailComponent,
       ),
   },
 ];

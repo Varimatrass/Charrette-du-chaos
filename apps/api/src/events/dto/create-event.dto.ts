@@ -1,7 +1,7 @@
 import { IsDateString, IsNotEmpty, IsString } from "class-validator";
-import type { CreateEditionInput } from "@desordre/shared-types";
+import type { CreateEventInput } from "@desordre/shared-types";
 
-export class CreateEditionDto implements CreateEditionInput {
+export class CreateEventDto implements CreateEventInput {
   @IsString()
   @IsNotEmpty()
   nom!: string;

@@ -7,7 +7,7 @@ import { ModeTransport, NiveauAttente, Sens, StatutTrajet } from "./enums";
 export type IsoDate = string;
 export type IsoTime = string;
 
-export interface Edition {
+export interface Event {
   id: string;
   nom: string;
   dateDebut: IsoDate;
@@ -24,7 +24,7 @@ export interface Edition {
  */
 export interface Pax {
   id: string;
-  editionId: string;
+  eventId: string;
   nom: string;
   contactEmail: string | null;
   contactTelephone: string | null;
@@ -43,7 +43,7 @@ export interface PaxAdmin extends Pax {
 
 export interface Trajet {
   id: string;
-  editionId: string;
+  eventId: string;
   paxId: string;
   sens: Sens;
   mode: ModeTransport;
@@ -59,7 +59,7 @@ export interface Trajet {
 
 export interface Navette {
   id: string;
-  editionId: string;
+  eventId: string;
   libelle: string;
   jour: IsoDate;
   sens: Sens;

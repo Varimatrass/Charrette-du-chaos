@@ -3,7 +3,7 @@ import type { RechercherPaxQuery } from "@desordre/shared-types";
 
 export class RechercherPaxDto implements RechercherPaxQuery {
   @IsUUID()
-  editionId!: string;
+  eventId!: string;
 
   @IsString()
   @IsNotEmpty()

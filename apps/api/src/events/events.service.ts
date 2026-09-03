@@ -1,14 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateEditionDto } from "./dto/create-edition.dto";
-import { UpdateEditionDto } from "./dto/update-edition.dto";
+import { CreateEventDto } from "./dto/create-event.dto";
+import { UpdateEventDto } from "./dto/update-event.dto";
 
 @Injectable()
-export class EditionsService {
+export class EventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateEditionDto) {
-    return this.prisma.edition.create({
+  create(dto: CreateEventDto) {
+    return this.prisma.event.create({
       data: {
         nom: dto.nom,
         dateDebut: new Date(dto.dateDebut),
@@ -20,18 +20,18 @@ export class EditionsService {
   }
 
   findAll() {
-    return this.prisma.edition.findMany({ orderBy: { dateDebut: "desc" } });
+    return this.prisma.event.findMany({ orderBy: { dateDebut: "desc" } });
   }
 
   async findOne(id: string) {
-    const edition = await this.prisma.edition.findUnique({ where: { id } });
-    if (!edition) throw new NotFoundException("Édition introuvable");
-    return edition;
+    const event = await this.prisma.event.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException("Évènement introuvable");
+    return event;
   }
 
-  async update(id: string, dto: UpdateEditionDto) {
+  async update(id: string, dto: UpdateEventDto) {
     await this.findOne(id);
-    return this.prisma.edition.update({
+    return this.prisma.event.update({
       where: { id },
       data: {
         ...(dto.nom !== undefined && { nom: dto.nom }),

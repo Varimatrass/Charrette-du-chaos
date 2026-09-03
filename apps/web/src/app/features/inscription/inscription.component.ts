@@ -7,7 +7,7 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatButtonModule } from "@angular/material/button";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
-import type { Edition } from "@desordre/shared-types";
+import type { Event } from "@desordre/shared-types";
 import { ApiService } from "../../core/services/api.service";
 
 interface InscriptionForm {
@@ -37,8 +37,8 @@ export class InscriptionComponent {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
 
-  readonly editionId = this.route.snapshot.paramMap.get("editionId")!;
-  readonly edition = signal<Edition | null>(null);
+  readonly eventId = this.route.snapshot.paramMap.get("eventId")!;
+  readonly event = signal<Event | null>(null);
   readonly enCours = signal(false);
   readonly erreur = signal<string | null>(null);
 
@@ -50,9 +50,9 @@ export class InscriptionComponent {
   });
 
   constructor() {
-    this.api.recupererEdition(this.editionId).subscribe({
-      next: (edition) => this.edition.set(edition),
-      error: () => this.erreur.set("Impossible de charger cette édition. Vérifie le lien."),
+    this.api.recupererEvent(this.eventId).subscribe({
+      next: (event) => this.event.set(event),
+      error: () => this.erreur.set("Impossible de charger cet évènement. Vérifie le lien."),
     });
   }
 
@@ -68,7 +68,7 @@ export class InscriptionComponent {
 
     this.api
       .creerPax({
-        editionId: this.editionId,
+        eventId: this.eventId,
         nom: valeurs.nom,
         contactEmail: valeurs.contactEmail || undefined,
         contactTelephone: valeurs.contactTelephone || undefined,

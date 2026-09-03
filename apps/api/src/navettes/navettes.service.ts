@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { calculerNiveauAttente } from "../common/attente.util";
-import { CreateNavetteDto } from "./dto/create-navette.dto";
-import { UpdateNavetteDto } from "./dto/update-navette.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { Sens } from '@desordre/shared-types';
+import { calculerNiveauAttente } from '../common/attente.util';
+import { CreateNavetteDto } from './dto/create-navette.dto';
+import { UpdateNavetteDto } from './dto/update-navette.dto';
 
 @Injectable()
 export class NavettesService {
@@ -11,7 +12,7 @@ export class NavettesService {
   create(dto: CreateNavetteDto) {
     return this.prisma.navette.create({
       data: {
-        editionId: dto.editionId,
+        eventId: dto.eventId,
         libelle: dto.libelle,
         jour: new Date(dto.jour),
         sens: dto.sens,
@@ -26,11 +27,11 @@ export class NavettesService {
     });
   }
 
-  async findAllForEdition(editionId: string) {
+  async findAllForEvent(eventId: string) {
     const navettes = await this.prisma.navette.findMany({
-      where: { editionId },
+      where: { eventId },
       include: { trajets: true },
-      orderBy: [{ jour: "asc" }, { heureDepart: "asc" }],
+      orderBy: [{ jour: 'asc' }, { heureDepart: 'asc' }],
     });
 
     return navettes.map(({ trajets, ...navette }) => ({
@@ -44,12 +45,17 @@ export class NavettesService {
       where: { id },
       include: { trajets: { include: { pax: true } } },
     });
-    if (!navette) throw new NotFoundException("Navette introuvable");
+    if (!navette) throw new NotFoundException('Navette introuvable');
 
     const { trajets, ...rest } = navette;
     const passagers = trajets.map((trajet) => ({
       ...trajet,
-      niveauAttente: calculerNiveauAttente(trajet.sens, trajet.heure, navette.heureArriveeGare),
+      niveauAttente: calculerNiveauAttente(
+        // Voir commentaire équivalent dans trajets.service.ts : cast sûr, même schéma Prisma.
+        trajet.sens as unknown as Sens,
+        trajet.heure,
+        navette.heureArriveeGare,
+      ),
     }));
 
     return {
@@ -70,8 +76,12 @@ export class NavettesService {
         ...(dto.conducteur !== undefined && { conducteur: dto.conducteur }),
         ...(dto.vehicule !== undefined && { vehicule: dto.vehicule }),
         ...(dto.heureDepart !== undefined && { heureDepart: dto.heureDepart }),
-        ...(dto.heureArriveeGare !== undefined && { heureArriveeGare: dto.heureArriveeGare }),
-        ...(dto.heureRetourLieu !== undefined && { heureRetourLieu: dto.heureRetourLieu }),
+        ...(dto.heureArriveeGare !== undefined && {
+          heureArriveeGare: dto.heureArriveeGare,
+        }),
+        ...(dto.heureRetourLieu !== undefined && {
+          heureRetourLieu: dto.heureRetourLieu,
+        }),
         ...(dto.capacite !== undefined && { capacite: dto.capacite }),
         ...(dto.commentaire !== undefined && { commentaire: dto.commentaire }),
       },
@@ -80,7 +90,7 @@ export class NavettesService {
 
   private async ensureExists(id: string) {
     const navette = await this.prisma.navette.findUnique({ where: { id } });
-    if (!navette) throw new NotFoundException("Navette introuvable");
+    if (!navette) throw new NotFoundException('Navette introuvable');
     return navette;
   }
 }

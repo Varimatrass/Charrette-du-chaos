@@ -3,7 +3,7 @@ import type { CreatePaxInput } from "@desordre/shared-types";
 
 export class CreatePaxDto implements CreatePaxInput {
   @IsUUID()
-  editionId!: string;
+  eventId!: string;
 
   @IsString()
   @IsNotEmpty()
