@@ -10,6 +10,9 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Seed explicite uniquement (comportement Prisma 7) : `pnpm prisma:seed`
+    // depuis la racine, ou `prisma db seed` directement dans apps/api.
+    seed: "ts-node prisma/seed.ts",
   },
   datasource: {
     url: env("DATABASE_URL"),

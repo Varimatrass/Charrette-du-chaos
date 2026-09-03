@@ -10,7 +10,8 @@
     "build": "pnpm --filter @desordre/shared-types run build && pnpm --filter @desordre/api run build && pnpm --filter @desordre/web run build",
     "prisma:generate": "pnpm --filter @desordre/api exec prisma generate",
     "prisma:migrate": "pnpm --filter @desordre/api exec prisma migrate dev",
-    "prisma:studio": "pnpm --filter @desordre/api exec prisma studio"
+    "prisma:studio": "pnpm --filter @desordre/api exec prisma studio",
+    "prisma:seed": "pnpm --filter @desordre/api exec prisma db seed"
   },
   "packageManager": "pnpm@10.28.0",
   "pnpm": {
