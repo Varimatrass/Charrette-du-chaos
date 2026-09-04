@@ -11,42 +11,157 @@
 
     <h2>Inscription transport</h2>
     <p>
-      Indique tes infos ci-dessous. Tu pourras revenir modifier ou compléter tes trajets aussi
-      souvent que nécessaire grâce au lien personnel qui te sera donné juste après.
+      Tu pourras revenir modifier ou compléter tes infos et tes trajets aussi souvent que
+      nécessaire grâce au lien personnel qui te sera donné juste après.
     </p>
 
     @if (erreur()) {
       <p class="erreur">{{ erreur() }}</p>
     }
 
-    <form [formGroup]="form" (ngSubmit)="soumettre()">
-      <mat-form-field appearance="outline">
-        <mat-label>Ton nom (le même que sur le Discord si possible)</mat-label>
-        <input matInput formControlName="nom" required />
-      </mat-form-field>
+    <mat-stepper linear #stepper>
+      <mat-step [stepControl]="infosForm" label="Tes infos">
+        <form [formGroup]="infosForm">
+          <mat-form-field appearance="outline">
+            <mat-label>Ton nom (le même que sur le Discord si possible)</mat-label>
+            <input matInput formControlName="nom" required />
+          </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Email (optionnel)</mat-label>
-        <input matInput type="email" formControlName="contactEmail" />
-      </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Email (optionnel)</mat-label>
+            <input matInput type="email" formControlName="contactEmail" />
+          </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Téléphone (optionnel)</mat-label>
-        <input matInput formControlName="contactTelephone" />
-      </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Discord (optionnel)</mat-label>
+            <input matInput formControlName="discordHandle" />
+          </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Commentaire (optionnel)</mat-label>
-        <textarea matInput formControlName="commentaire" rows="2"></textarea>
-      </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Téléphone (optionnel)</mat-label>
+            <input matInput formControlName="contactTelephone" />
+          </mat-form-field>
 
-      <button mat-flat-button color="primary" type="submit" [disabled]="enCours()">
-        @if (enCours()) {
-          <mat-spinner diameter="20"></mat-spinner>
-        } @else {
-          Continuer
+          <mat-form-field appearance="outline">
+            <mat-label>Commentaire (optionnel)</mat-label>
+            <textarea matInput formControlName="commentaire" rows="2"></textarea>
+          </mat-form-field>
+
+          <div class="actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              matStepperNext
+              [disabled]="infosForm.invalid"
+            >
+              Continuer
+            </button>
+          </div>
+        </form>
+      </mat-step>
+
+      <mat-step label="Transport">
+        <p class="aide">
+          Pas encore d'horaire précis, ou tu ne sais pas encore comment tu voyages ? Laisse en
+          blanc, tu pourras compléter plus tard.
+        </p>
+
+        @for (sens of [Sens.ALLER, Sens.RETOUR]; track sens) {
+          <div class="bloc-trajet" [formGroup]="trajetForms[sens]">
+            <h3>{{ sens === Sens.ALLER ? "Aller" : "Retour" }}</h3>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Moyen de transport</mat-label>
+              <mat-select formControlName="mode">
+                <mat-option [value]="null">Je sais pas encore</mat-option>
+                <mat-option [value]="ModeTransport.TRAIN">Train</mat-option>
+                <mat-option [value]="ModeTransport.COVOITURAGE">Covoiturage</mat-option>
+                <mat-option [value]="ModeTransport.AUTRE">Autre</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            @if (trajetForms[sens].value.mode === ModeTransport.TRAIN) {
+              <mat-form-field appearance="outline">
+                <mat-label>Gare</mat-label>
+                <input matInput formControlName="gare" />
+              </mat-form-field>
+            }
+
+            <mat-form-field appearance="outline">
+              <mat-label>Jour (si tu le connais déjà)</mat-label>
+              <input matInput type="date" formControlName="jour" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Heure (si tu la connais déjà)</mat-label>
+              <input matInput type="time" formControlName="heure" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Commentaire (optionnel)</mat-label>
+              <textarea matInput formControlName="commentaire" rows="2"></textarea>
+            </mat-form-field>
+          </div>
         }
-      </button>
-    </form>
+
+        @if (afficherBlocVehicule()) {
+          <div class="bloc-trajet" [formGroup]="vehiculeForm">
+            <h3>Véhicule et conduite</h3>
+            <p class="aide">
+              Question posée une seule fois, elle est valable pour l'aller comme pour le retour.
+            </p>
+
+            <p class="question">As-tu ton propre véhicule ?</p>
+            <mat-radio-group formControlName="hasVehicle">
+              <mat-radio-button [value]="true">Oui</mat-radio-button>
+              <mat-radio-button [value]="false">Non</mat-radio-button>
+            </mat-radio-group>
+
+            @if (vehiculeForm.value.hasVehicle === true) {
+              <p class="question">Accepterais-tu de le prêter pour des navettes ?</p>
+              <mat-radio-group formControlName="vehicleLendingMode">
+                <mat-radio-button [value]="VehicleLendingMode.NOT_AVAILABLE">Non</mat-radio-button>
+                <mat-radio-button [value]="VehicleLendingMode.ONLY_IF_OWNER_DRIVES">
+                  Oui, mais seulement si c'est moi qui conduis
+                </mat-radio-button>
+                <mat-radio-button [value]="VehicleLendingMode.AVAILABLE_ANY_DRIVER">
+                  Oui, même si quelqu'un d'autre conduit
+                </mat-radio-button>
+              </mat-radio-group>
+
+              <p class="question">Accepterais-tu de conduire des navettes ?</p>
+              <mat-radio-group formControlName="willingToDriveShuttle">
+                <mat-radio-button [value]="true">Oui</mat-radio-button>
+                <mat-radio-button [value]="false">Non</mat-radio-button>
+              </mat-radio-group>
+            }
+
+            @if (vehiculeForm.value.hasVehicle === false) {
+              <p class="question">As-tu le permis ?</p>
+              <mat-radio-group formControlName="hasDrivingLicense">
+                <mat-radio-button [value]="true">Oui</mat-radio-button>
+                <mat-radio-button [value]="false">Non</mat-radio-button>
+              </mat-radio-group>
+
+              <p class="question">Voudrais-tu conduire des navettes (avec un véhicule prêté) ?</p>
+              <mat-radio-group formControlName="willingToDriveShuttle">
+                <mat-radio-button [value]="true">Oui</mat-radio-button>
+                <mat-radio-button [value]="false">Non</mat-radio-button>
+              </mat-radio-group>
+            }
+          </div>
+        }
+
+        <div class="actions">
+          <button mat-button type="button" matStepperPrevious>Retour</button>
+          <button mat-flat-button color="primary" type="button" [disabled]="enCours()" (click)="soumettre()">
+            @if (enCours()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            } @else {
+              Terminer l'inscription
+            }
+          </button>
+        </div>
+      </mat-step>
+    </mat-stepper>
   </mat-card>
 </div>

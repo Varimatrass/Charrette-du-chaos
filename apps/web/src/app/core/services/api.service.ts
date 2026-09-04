@@ -81,7 +81,9 @@ export class ApiService {
   enregistrerMonTrajet(
     token: string,
     sens: "ALLER" | "RETOUR",
-    input: { mode: string; jour?: string; heure?: string; gare?: string; commentaire?: string },
+    // `mode` facultatif : "je sais pas encore" est un choix valide, écrit
+    // explicitement `null` en base côté API (voir trajets.service.ts).
+    input: { mode?: string; jour?: string; heure?: string; gare?: string; commentaire?: string },
   ): Observable<Trajet> {
     return this.http.put<Trajet>(`${this.base}/pax/moi/trajets/${sens}`, input, {
       headers: { "x-pax-token": token },
