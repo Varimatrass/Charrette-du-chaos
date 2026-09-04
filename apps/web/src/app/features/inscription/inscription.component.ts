@@ -1,7 +1,7 @@
 import { Component, inject, signal } from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { ReactiveFormsModule, FormControl, FormGroup, Validators } from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -22,6 +22,7 @@ interface InscriptionForm {
   standalone: true,
   imports: [
     DatePipe,
+    RouterLink,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,

@@ -1,5 +1,7 @@
 <div class="page">
   <mat-card class="carte">
+    <a class="retour" [routerLink]="['/e', eventId]">‹ Retour</a>
+
     @if (event(); as e) {
       <h1>{{ e.nom }}</h1>
       <p class="sous-titre">

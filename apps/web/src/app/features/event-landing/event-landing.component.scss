@@ -15,10 +15,11 @@
   margin-top: -0.5rem;
 }
 
-form {
+.choix {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 mat-form-field {
@@ -27,16 +28,4 @@ mat-form-field {
 
 .erreur {
   color: #b3261e;
-}
-
-.retour {
-  display: inline-block;
-  margin-bottom: 0.75rem;
-  color: rgba(0, 0, 0, 0.6);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.retour:hover {
-  text-decoration: underline;
 }

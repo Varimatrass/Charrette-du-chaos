@@ -1,0 +1,40 @@
+<div class="page">
+  <mat-card class="carte">
+    @if (event(); as e) {
+      <h1>{{ e.nom }}</h1>
+      <p class="sous-titre">
+        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} — {{ e.lieu }}
+      </p>
+    }
+
+    @if (erreur()) {
+      <p class="erreur">{{ erreur() }}</p>
+    } @else if (!modeConnexion()) {
+      <p>Pour gérer ton transport (train, navette, covoiturage...), commence ici.</p>
+
+      <div class="choix">
+        <button mat-flat-button color="primary" type="button" (click)="allerInscription()">
+          Première fois ici
+        </button>
+        <button mat-stroked-button type="button" (click)="afficherConnexion()">
+          J'ai déjà un compte
+        </button>
+      </div>
+    } @else {
+      <p>Colle ton lien personnel, ou juste le code qu'il contient.</p>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Ton lien ou ton code personnel</mat-label>
+        <input matInput [formControl]="tokenControl" (keyup.enter)="seConnecter()" />
+        @if (tokenControl.invalid && tokenControl.touched) {
+          <mat-error>Il faut renseigner ton lien ou ton code.</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="choix">
+        <button mat-flat-button color="primary" type="button" (click)="seConnecter()">Continuer</button>
+        <button mat-button type="button" (click)="annulerConnexion()">Retour</button>
+      </div>
+    }
+  </mat-card>
+</div>
