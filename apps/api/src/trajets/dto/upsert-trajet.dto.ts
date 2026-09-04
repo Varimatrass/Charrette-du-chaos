@@ -8,8 +8,10 @@ import { ModeTransport } from "@desordre/shared-types";
  * changer d'avis ou compléter plus tard (ex: ajouter le retour après coup).
  */
 export class UpsertTrajetDto {
+  // Facultatif : "pas encore décidé" est un état valide à l'inscription.
+  @IsOptional()
   @IsEnum(ModeTransport)
-  mode!: ModeTransport;
+  mode?: ModeTransport;
 
   @IsOptional()
   @IsString()

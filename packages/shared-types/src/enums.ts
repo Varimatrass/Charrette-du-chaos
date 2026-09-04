@@ -38,3 +38,14 @@ export enum NiveauAttente {
   MOYEN = "MOYEN", // >= 30 min (jaune dans le Sheet d'origine)
   ELEVE = "ELEVE", // >= 1h (orange dans le Sheet d'origine)
 }
+
+/**
+ * Nuance du prêt de véhicule pour les navettes : certain·es pax acceptent de
+ * prêter leur véhicule uniquement si c'est elleux qui le conduisent (question
+ * d'assurance), d'autres l'acceptent même si quelqu'un d'autre conduit.
+ */
+export enum VehicleLendingMode {
+  NOT_AVAILABLE = "NOT_AVAILABLE",
+  ONLY_IF_OWNER_DRIVES = "ONLY_IF_OWNER_DRIVES",
+  AVAILABLE_ANY_DRIVER = "AVAILABLE_ANY_DRIVER",
+}

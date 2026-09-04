@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Pax } from "@prisma/client";
+import type { VehicleLendingMode as PrismaVehicleLendingMode } from "@prisma/client";
 import type { PaxSubmissionResult } from "@desordre/shared-types";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreatePaxDto } from "./dto/create-pax.dto";
@@ -20,7 +21,15 @@ export class PaxService {
         nom: dto.nom,
         contactEmail: dto.contactEmail,
         contactTelephone: dto.contactTelephone,
+        discordHandle: dto.discordHandle,
         commentaire: dto.commentaire,
+        hasVehicle: dto.hasVehicle,
+        // Cast sûr : même nuance nominale Prisma/shared-types que pour les
+        // autres enums (voir trajets.service.ts) — mêmes valeurs, deux types
+        // TS distincts.
+        vehicleLendingMode: dto.vehicleLendingMode as unknown as PrismaVehicleLendingMode,
+        hasDrivingLicense: dto.hasDrivingLicense,
+        willingToDriveShuttle: dto.willingToDriveShuttle,
       },
     });
 
@@ -34,7 +43,16 @@ export class PaxService {
         ...(dto.nom !== undefined && { nom: dto.nom }),
         ...(dto.contactEmail !== undefined && { contactEmail: dto.contactEmail }),
         ...(dto.contactTelephone !== undefined && { contactTelephone: dto.contactTelephone }),
+        ...(dto.discordHandle !== undefined && { discordHandle: dto.discordHandle }),
         ...(dto.commentaire !== undefined && { commentaire: dto.commentaire }),
+        ...(dto.hasVehicle !== undefined && { hasVehicle: dto.hasVehicle }),
+        ...(dto.vehicleLendingMode !== undefined && {
+          vehicleLendingMode: dto.vehicleLendingMode as unknown as PrismaVehicleLendingMode,
+        }),
+        ...(dto.hasDrivingLicense !== undefined && { hasDrivingLicense: dto.hasDrivingLicense }),
+        ...(dto.willingToDriveShuttle !== undefined && {
+          willingToDriveShuttle: dto.willingToDriveShuttle,
+        }),
       },
     });
     return this.toPublic(updated);

@@ -105,7 +105,10 @@ export class MonEspaceComponent {
           const trajet = pax.trajets.find((t) => t.sens === sens);
           if (trajet) {
             this.trajetForms[sens].patchValue({
-              mode: trajet.mode,
+              // Le mode peut être `null` en base ("pas encore décidé") ; le
+              // formulaire actuel n'a pas encore cette option, on retombe
+              // sur Train par défaut en attendant la Phase 2 du parcours pax.
+              mode: trajet.mode ?? ModeTransport.TRAIN,
               jour: trajet.jour ? trajet.jour.substring(0, 10) : "",
               heure: trajet.heure ?? "",
               gare: trajet.gare ?? "",

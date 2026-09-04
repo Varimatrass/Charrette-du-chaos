@@ -24,7 +24,10 @@ export class TrajetsService {
     });
 
     const donneesCommunes = {
-      mode: dto.mode,
+      // `undefined` -> `null` explicite : "pas encore décidé" doit être écrit
+      // en base, pas juste omis (sinon un update ne pourrait jamais revenir
+      // à "pas décidé" après avoir été renseigné une première fois).
+      mode: dto.mode ?? null,
       jour: dto.jour ? new Date(dto.jour) : null,
       heure: dto.heure ?? null,
       gare: dto.gare ?? null,

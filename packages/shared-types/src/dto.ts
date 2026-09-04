@@ -1,4 +1,4 @@
-import { ModeTransport, Sens, StatutTrajet } from "./enums";
+import { ModeTransport, Sens, StatutTrajet, VehicleLendingMode } from "./enums";
 
 // ---- Évènement ----
 
@@ -23,7 +23,12 @@ export interface CreatePaxInput {
   nom: string;
   contactEmail?: string;
   contactTelephone?: string;
+  discordHandle?: string;
   commentaire?: string;
+  hasVehicle?: boolean;
+  vehicleLendingMode?: VehicleLendingMode;
+  hasDrivingLicense?: boolean;
+  willingToDriveShuttle?: boolean;
 }
 
 export type UpdatePaxInput = Partial<Omit<CreatePaxInput, "eventId">>;
@@ -40,7 +45,9 @@ export interface PaxSubmissionResult {
 
 export interface CreateTrajetInput {
   sens: Sens;
-  mode: ModeTransport;
+  // Facultatif : le mode de transport peut être "pas encore décidé" à
+  // l'inscription et précisé plus tard.
+  mode?: ModeTransport;
   jour?: string;
   heure?: string;
   gare?: string;
@@ -82,3 +89,15 @@ export interface RechercherPaxQuery {
   eventId: string;
   nom: string;
 }
+
+
+// ---- Créneaux de disponibilité conducteur·ice ----
+
+export interface CreateDriverAvailabilitySlotInput {
+  day: string;
+  startTime?: string;
+  endTime?: string;
+  comment?: string;
+}
+
+export type UpdateDriverAvailabilitySlotInput = Partial<CreateDriverAvailabilitySlotInput>;

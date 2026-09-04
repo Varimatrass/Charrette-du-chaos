@@ -1,4 +1,4 @@
-import { ModeTransport, NiveauAttente, Sens, StatutTrajet } from "./enums";
+import { ModeTransport, NiveauAttente, Sens, StatutTrajet, VehicleLendingMode } from "./enums";
 
 /**
  * Toutes les dates/heures transitent en JSON sous forme de chaînes ISO 8601.
@@ -28,7 +28,15 @@ export interface Pax {
   nom: string;
   contactEmail: string | null;
   contactTelephone: string | null;
+  discordHandle: string | null;
   commentaire: string | null;
+  // Bloc véhicule/conduite : `null` veut dire "pas encore répondu", à
+  // distinguer de `false` ("non"). `vehicleLendingMode` n'a de sens que
+  // si `hasVehicle` est `true`.
+  hasVehicle: boolean | null;
+  vehicleLendingMode: VehicleLendingMode | null;
+  hasDrivingLicense: boolean | null;
+  willingToDriveShuttle: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,7 +54,9 @@ export interface Trajet {
   eventId: string;
   paxId: string;
   sens: Sens;
-  mode: ModeTransport;
+  // `null` = mode de transport pas encore décidé à l'inscription (le pax
+  // pourra revenir le préciser plus tard, comme le reste du trajet).
+  mode: ModeTransport | null;
   jour: IsoDate | null;
   heure: IsoTime | null;
   gare: string | null;
@@ -110,4 +120,22 @@ export interface NavetteAvecNomsPassagers extends NavetteAvecPlacesRestantes {
 /** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */
 export interface NavetteAvecPassagers extends NavetteAvecPlacesRestantes {
   passagers: TrajetAvecPax[];
+}
+
+
+/**
+ * Créneau où un·e pax ayant accepté de conduire des navettes se déclare
+ * disponible. Sert de base aux admins pour créer les navettes avec un·e
+ * conducteur·ice déjà partant·e.
+ */
+export interface DriverAvailabilitySlot {
+  id: string;
+  eventId: string;
+  paxId: string;
+  day: IsoDate;
+  startTime: IsoTime | null;
+  endTime: IsoTime | null;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

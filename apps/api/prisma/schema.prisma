@@ -30,6 +30,15 @@ enum StatutTrajet {
   A_REVERIFIER
 }
 
+// Nuance du prêt de véhicule pour les navettes : certain·es pax acceptent de
+// prêter leur véhicule uniquement si c'est elleux qui le conduisent (question
+// d'assurance), d'autres l'acceptent même si quelqu'un d'autre conduit.
+enum VehicleLendingMode {
+  NOT_AVAILABLE
+  ONLY_IF_OWNER_DRIVES
+  AVAILABLE_ANY_DRIVER
+}
+
 model Event {
   id            String   @id @default(uuid())
   nom           String
@@ -40,9 +49,10 @@ model Event {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  paxs     Pax[]
-  navettes Navette[]
-  trajets  Trajet[]
+  paxs                    Pax[]
+  navettes                Navette[]
+  trajets                 Trajet[]
+  driverAvailabilitySlots DriverAvailabilitySlot[]
 
   @@map("events")
 }
@@ -53,7 +63,15 @@ model Pax {
   nom              String
   contactEmail     String?  @map("contact_email")
   contactTelephone String?  @map("contact_telephone")
+  discordHandle    String?  @map("discord_handle")
   commentaire      String?
+  // Bloc véhicule/conduite (parcours d'inscription v2) : tout reste nullable
+  // car non renseigné au départ pour les pax existants, et parce que "pas
+  // encore répondu" doit rester distinct de "non" pour l'organisation.
+  hasVehicle            Boolean?            @map("has_vehicle")
+  vehicleLendingMode    VehicleLendingMode? @map("vehicle_lending_mode")
+  hasDrivingLicense     Boolean?            @map("has_driving_license")
+  willingToDriveShuttle Boolean?            @map("willing_to_drive_shuttle")
   // Jeton d'accès personnel non devinable : c'est ce qui permet à un pax
   // de revenir modifier ses infos sans compte. Ne jamais l'exposer dans les
   // vues publiques/listes, seulement dans la réponse de création et le
@@ -62,8 +80,9 @@ model Pax {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  trajets Trajet[]
+  event                   Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trajets                 Trajet[]
+  driverAvailabilitySlots DriverAvailabilitySlot[]
 
   @@index([eventId])
   @@map("paxs")
@@ -93,11 +112,14 @@ model Navette {
 }
 
 model Trajet {
-  id          String        @id @default(uuid())
-  eventId     String        @map("event_id")
-  paxId       String        @map("pax_id")
-  sens        Sens
-  mode        ModeTransport
+  id      String @id @default(uuid())
+  eventId String @map("event_id")
+  paxId   String @map("pax_id")
+  sens    Sens
+  // Nullable : à l'inscription, le mode de transport peut être "pas encore
+  // décidé" (ex: arrivée en train, retour indécis) — le pax pourra revenir
+  // le préciser plus tard, comme le reste du trajet.
+  mode        ModeTransport?
   jour        DateTime?     @db.Date
   heure       String? // "HH:mm"
   gare        String?
@@ -117,4 +139,26 @@ model Trajet {
   @@index([eventId])
   @@index([navetteId])
   @@map("trajets")
+}
+
+// Créneau où un·e pax ayant accepté de conduire des navettes se déclare
+// disponible. Les admins piochent dedans pour créer les navettes avec un·e
+// conducteur·ice déjà partant·e, plutôt que de saisir un nom à la main.
+model DriverAvailabilitySlot {
+  id        String   @id @default(uuid())
+  eventId   String   @map("event_id")
+  paxId     String   @map("pax_id")
+  day       DateTime @db.Date
+  startTime String?  @map("start_time") // "HH:mm"
+  endTime   String?  @map("end_time") // "HH:mm"
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  pax   Pax   @relation(fields: [paxId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([paxId])
+  @@map("driver_availability_slots")
 }

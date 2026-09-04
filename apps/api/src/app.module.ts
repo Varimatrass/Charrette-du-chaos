@@ -7,6 +7,7 @@ import { EventsModule } from "./events/events.module";
 import { PaxModule } from "./pax/pax.module";
 import { TrajetsModule } from "./trajets/trajets.module";
 import { NavettesModule } from "./navettes/navettes.module";
+import { DriverAvailabilityModule } from "./driver-availability/driver-availability.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NavettesModule } from "./navettes/navettes.module";
     PaxModule,
     TrajetsModule,
     NavettesModule,
+    DriverAvailabilityModule,
   ],
   controllers: [AppController],
   providers: [AppService],
