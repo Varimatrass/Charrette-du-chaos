@@ -9,7 +9,10 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
+import { MatTableModule } from "@angular/material/table";
+import { DatePipe } from "@angular/common";
 import { ModeTransport, Sens, StatutTrajet } from "@desordre/shared-types";
+import type { NavetteAvecNomsPassagers, PassagerNom } from "@desordre/shared-types";
 import { ApiService, PaxAvecTrajets } from "../../core/services/api.service";
 
 interface TrajetFormGroup {
@@ -34,6 +37,7 @@ function creerTrajetForm(): FormGroup<TrajetFormGroup> {
   selector: "app-mon-espace",
   standalone: true,
   imports: [
+    DatePipe,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,
@@ -43,6 +47,7 @@ function creerTrajetForm(): FormGroup<TrajetFormGroup> {
     MatIconModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatTableModule,
   ],
   templateUrl: "./mon-espace.component.html",
   styleUrl: "./mon-espace.component.scss",
@@ -64,6 +69,9 @@ export class MonEspaceComponent {
   readonly pax = signal<PaxAvecTrajets | null>(null);
   readonly enregistrementInfos = signal(false);
   readonly enregistrementTrajet = signal<Sens | null>(null);
+
+  readonly navettes = signal<NavetteAvecNomsPassagers[]>([]);
+  readonly colonnesNavettes = ["libelle", "sens", "jour", "heures", "conducteur", "places", "passagers"];
 
   readonly infosForm = new FormGroup({
     nom: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
@@ -113,10 +121,26 @@ export class MonEspaceComponent {
         this.erreur.set("Ce lien personnel n'est plus valide. Contacte l'organisation pour le retrouver.");
       },
     });
+
+    // Planning des navettes de l'évènement : indépendant du reste, une erreur ici
+    // ne doit pas empêcher d'afficher/modifier ses infos et ses trajets.
+    this.api.listerNavettesMonEvent(this.token).subscribe({
+      next: (navettes) => this.navettes.set(navettes),
+      error: () => this.navettes.set([]),
+    });
   }
 
   navetteAssignee(sens: Sens) {
     return this.pax()?.trajets.find((t) => t.sens === sens)?.navette ?? null;
+  }
+
+  /** Pour surligner dans le planning la ou les navettes déjà assignées à ce pax. */
+  estMaNavette(navetteId: string): boolean {
+    return (this.pax()?.trajets ?? []).some((t) => t.navette?.id === navetteId);
+  }
+
+  nomsPassagers(passagers: PassagerNom[]): string {
+    return passagers.map((p) => p.nom).join(", ");
   }
 
   statutTrajet(sens: Sens): StatutTrajet | null {

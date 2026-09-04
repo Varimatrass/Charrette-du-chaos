@@ -8,7 +8,9 @@ import type {
   CreatePaxInput,
   Event,
   Navette,
+  NavetteAvecNomsPassagers,
   NavetteAvecPassagers,
+  NavetteAvecPlacesRestantes,
   Pax,
   PaxAdmin,
   PaxSubmissionResult,
@@ -63,6 +65,13 @@ export class ApiService {
     });
   }
 
+  /** Planning des navettes de son évènement (lecture seule, avec noms des co-passager·es). */
+  listerNavettesMonEvent(token: string): Observable<NavetteAvecNomsPassagers[]> {
+    return this.http.get<NavetteAvecNomsPassagers[]>(`${this.base}/pax/moi/navettes`, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
   modifierMesInfos(token: string, input: UpdatePaxInput): Observable<Pax> {
     return this.http.patch<Pax>(`${this.base}/pax/moi`, input, {
       headers: { "x-pax-token": token },
@@ -93,8 +102,8 @@ export class ApiService {
 
   // ---- Navettes (back-office) ----
 
-  listerNavettes(eventId: string): Observable<(Navette & { placesRestantes: number })[]> {
-    return this.http.get<(Navette & { placesRestantes: number })[]>(`${this.base}/admin/navettes`, {
+  listerNavettes(eventId: string): Observable<NavetteAvecPlacesRestantes[]> {
+    return this.http.get<NavetteAvecPlacesRestantes[]>(`${this.base}/admin/navettes`, {
       params: { eventId },
     });
   }

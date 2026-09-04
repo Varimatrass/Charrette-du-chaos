@@ -40,6 +40,28 @@ export class NavettesService {
     }));
   }
 
+  /**
+   * Planning pour les paxs : mêmes navettes que `findAllForEvent`, mais avec
+   * en plus les noms de leurs co-passager·es (jamais l'email/téléphone —
+   * voir le commentaire sur `PassagerNom` dans shared-types). Dans un
+   * évènement en autogestion, savoir qui conduit et qui est dans la navette
+   * est utile aux paxs ; leurs coordonnées de contact restent privées entre
+   * elleux.
+   */
+  async findAllForEventPourPax(eventId: string) {
+    const navettes = await this.prisma.navette.findMany({
+      where: { eventId },
+      include: { trajets: { include: { pax: { select: { id: true, nom: true } } } } },
+      orderBy: [{ jour: 'asc' }, { heureDepart: 'asc' }],
+    });
+
+    return navettes.map(({ trajets, ...navette }) => ({
+      ...navette,
+      placesRestantes: navette.capacite - trajets.length,
+      passagers: trajets.map((trajet) => ({ paxId: trajet.pax.id, nom: trajet.pax.nom })),
+    }));
+  }
+
   async findOne(id: string) {
     const navette = await this.prisma.navette.findUnique({
       where: { id },

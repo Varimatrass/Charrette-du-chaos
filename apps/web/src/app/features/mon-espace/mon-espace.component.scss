@@ -60,3 +60,21 @@ mat-form-field {
 .erreur {
   color: #b3261e;
 }
+
+.tableau-scroll {
+  overflow-x: auto;
+}
+
+.tableau {
+  width: 100%;
+}
+
+tr.ma-navette {
+  background: #e8f5e9;
+}
+
+.vehicule {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+}

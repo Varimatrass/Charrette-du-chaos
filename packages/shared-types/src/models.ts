@@ -80,8 +80,34 @@ export interface TrajetAvecPax extends Trajet {
   niveauAttente: NiveauAttente | null;
 }
 
-/** Une navette avec la liste de ses passager·es et ses places restantes calculées. */
-export interface NavetteAvecPassagers extends Navette {
-  passagers: TrajetAvecPax[];
+/** Une navette avec ses places restantes calculées. */
+export interface NavetteAvecPlacesRestantes extends Navette {
   placesRestantes: number;
+}
+
+/**
+ * Un co-passager·e tel que vu par les autres paxs de la même navette : juste
+ * son nom. Contrairement à `Pax`, ne contient jamais l'email ni le
+ * téléphone — dans un évènement en autogestion, les paxs d'une même navette
+ * savent qui la conduit et avec qui iels la partagent (c'est même utile,
+ * pour se retrouver), mais leurs coordonnées de contact restent privées
+ * entre elleux.
+ */
+export interface PassagerNom {
+  paxId: string;
+  nom: string;
+}
+
+/**
+ * Vue d'une navette pour les paxs : conducteur·ice/véhicule (déjà sur
+ * `Navette`), places restantes, et noms des co-passager·es — jamais leurs
+ * coordonnées de contact.
+ */
+export interface NavetteAvecNomsPassagers extends NavetteAvecPlacesRestantes {
+  passagers: PassagerNom[];
+}
+
+/** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */
+export interface NavetteAvecPassagers extends NavetteAvecPlacesRestantes {
+  passagers: TrajetAvecPax[];
 }

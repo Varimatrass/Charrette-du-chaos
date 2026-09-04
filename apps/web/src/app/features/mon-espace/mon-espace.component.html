@@ -23,6 +23,68 @@
       </mat-card>
 
       <mat-card class="carte">
+        <h2>Navettes de l'évènement</h2>
+        <p class="aide">
+          Planning en lecture seule, pour t'aider à choisir ton horaire de train et savoir avec
+          qui tu voyages. La ou les navettes qui te sont déjà assignées sont surlignées.
+        </p>
+        @if (navettes().length === 0) {
+          <p>Aucune navette publiée pour l'instant.</p>
+        } @else {
+          <div class="tableau-scroll">
+            <table mat-table [dataSource]="navettes()" class="tableau">
+              <ng-container matColumnDef="libelle">
+                <th mat-header-cell *matHeaderCellDef>Navette</th>
+                <td mat-cell *matCellDef="let n">{{ n.libelle }}</td>
+              </ng-container>
+              <ng-container matColumnDef="sens">
+                <th mat-header-cell *matHeaderCellDef>Sens</th>
+                <td mat-cell *matCellDef="let n">{{ n.sens === Sens.ALLER ? "Aller" : "Retour" }}</td>
+              </ng-container>
+              <ng-container matColumnDef="jour">
+                <th mat-header-cell *matHeaderCellDef>Jour</th>
+                <td mat-cell *matCellDef="let n">{{ n.jour | date: "d MMM" }}</td>
+              </ng-container>
+              <ng-container matColumnDef="heures">
+                <th mat-header-cell *matHeaderCellDef>Horaires</th>
+                <td mat-cell *matCellDef="let n">{{ n.heureDepart }} → gare {{ n.heureArriveeGare }}</td>
+              </ng-container>
+              <ng-container matColumnDef="conducteur">
+                <th mat-header-cell *matHeaderCellDef>Conducteur·ice</th>
+                <td mat-cell *matCellDef="let n">
+                  {{ n.conducteur || "?" }}
+                  @if (n.vehicule) {
+                    <span class="vehicule">({{ n.vehicule }})</span>
+                  }
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="places">
+                <th mat-header-cell *matHeaderCellDef>Places restantes</th>
+                <td mat-cell *matCellDef="let n">{{ n.placesRestantes }} / {{ n.capacite }}</td>
+              </ng-container>
+              <ng-container matColumnDef="passagers">
+                <th mat-header-cell *matHeaderCellDef>Avec qui</th>
+                <td mat-cell *matCellDef="let n">
+                  @if (n.passagers.length === 0) {
+                    <span class="aide">personne pour l'instant</span>
+                  } @else {
+                    {{ nomsPassagers(n.passagers) }}
+                  }
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="colonnesNavettes"></tr>
+              <tr
+                mat-row
+                *matRowDef="let row; columns: colonnesNavettes"
+                [class.ma-navette]="estMaNavette(row.id)"
+              ></tr>
+            </table>
+          </div>
+        }
+      </mat-card>
+
+      <mat-card class="carte">
         <h1>Bonjour {{ pax()?.nom }} 👋</h1>
 
         <h2>Mes infos</h2>
