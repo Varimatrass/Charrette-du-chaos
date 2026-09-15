@@ -1,11 +1,12 @@
 <div class="entete">
-  <button mat-flat-button color="primary" (click)="afficherFormulaire.set(!afficherFormulaire())">
-    Nouvelle navette
+  <button mat-flat-button color="primary" (click)="afficherFormulaire() ? annulerEdition() : ouvrirCreation()">
+    {{ afficherFormulaire() ? "Annuler" : "Nouvelle navette" }}
   </button>
 </div>
 
 @if (afficherFormulaire()) {
-  <form [formGroup]="form" (ngSubmit)="creer()" class="formulaire">
+  <form [formGroup]="form" (ngSubmit)="soumettre()" class="formulaire">
+    <h3 class="pleine-largeur">{{ navetteEnEdition() ? "Modifier la navette" : "Nouvelle navette" }}</h3>
     <mat-form-field appearance="outline">
       <mat-label>Libellé</mat-label>
       <input matInput formControlName="libelle" placeholder="Navette 1 aller vendredi 14h45" />
@@ -62,7 +63,9 @@
       <mat-label>Commentaire</mat-label>
       <textarea matInput formControlName="commentaire" rows="2"></textarea>
     </mat-form-field>
-    <button mat-flat-button color="primary" type="submit" class="pleine-largeur">Créer la navette</button>
+    <button mat-flat-button color="primary" type="submit" class="pleine-largeur">
+      {{ navetteEnEdition() ? "Enregistrer les modifications" : "Créer la navette" }}
+    </button>
   </form>
 }
 
@@ -90,6 +93,7 @@
   <ng-container matColumnDef="actions">
     <th mat-header-cell *matHeaderCellDef></th>
     <td mat-cell *matCellDef="let n">
+      <button mat-button (click)="modifier(n)">Modifier</button>
       <button mat-button (click)="voirDetail(n.id)">
         {{ navetteOuverte()?.id === n.id ? "Masquer" : "Voir les passager·es" }}
       </button>
