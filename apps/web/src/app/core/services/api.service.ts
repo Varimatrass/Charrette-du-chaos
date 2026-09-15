@@ -12,12 +12,14 @@ import type {
   NavetteAvecPassagers,
   NavetteAvecPlacesRestantes,
   Pax,
+  PaxOverview,
   PaxAdmin,
   PaxSubmissionResult,
   SetStatutTrajetInput,
   StatutTrajet,
   Trajet,
   TrajetAvecPax,
+  TrajetOverview,
   UpdateEventInput,
   UpdateNavetteInput,
   UpdatePaxInput,
@@ -68,6 +70,20 @@ export class ApiService {
   /** Planning des navettes de son évènement (lecture seule, avec noms des co-passager·es). */
   listerNavettesMonEvent(token: string): Observable<NavetteAvecNomsPassagers[]> {
     return this.http.get<NavetteAvecNomsPassagers[]>(`${this.base}/pax/moi/navettes`, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
+  /** Annuaire des paxs de son évènement (lecture seule, jamais leurs coordonnées). */
+  listerPaxsMonEvent(token: string): Observable<PaxOverview[]> {
+    return this.http.get<PaxOverview[]>(`${this.base}/pax/moi/paxs`, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
+  /** Tous les trajets de son évènement (lecture seule, jamais les coordonnées des autres paxs). */
+  listerTrajetsMonEvent(token: string): Observable<TrajetOverview[]> {
+    return this.http.get<TrajetOverview[]>(`${this.base}/pax/moi/trajets`, {
       headers: { "x-pax-token": token },
     });
   }

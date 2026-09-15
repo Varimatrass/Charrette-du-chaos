@@ -4,6 +4,7 @@ import { CurrentPax } from "../common/decorators/current-pax.decorator";
 import { PaxTokenGuard } from "../common/guards/pax-token.guard";
 import type { Pax } from "@prisma/client";
 import { NavettesService } from "../navettes/navettes.service";
+import { TrajetsService } from "../trajets/trajets.service";
 import { CreatePaxDto } from "./dto/create-pax.dto";
 import { RechercherPaxDto } from "./dto/rechercher-pax.dto";
 import { UpdatePaxDto } from "./dto/update-pax.dto";
@@ -14,6 +15,7 @@ export class PaxController {
   constructor(
     private readonly paxService: PaxService,
     private readonly navettesService: NavettesService,
+    private readonly trajetsService: TrajetsService,
   ) {}
 
   /** Première saisie, publique : n'importe qui avec le lien de l'évènement peut s'inscrire. */
@@ -44,6 +46,27 @@ export class PaxController {
   @Get("pax/moi/navettes")
   navettesDeMonEvent(@CurrentPax() pax: Pax) {
     return this.navettesService.findAllForEventPourPax(pax.eventId);
+  }
+
+  /**
+   * Annuaire des paxs de son évènement, en lecture seule : jamais les
+   * coordonnées de contact (email/téléphone) ni le jeton d'accès des autres.
+   */
+  @UseGuards(PaxTokenGuard)
+  @Get("pax/moi/paxs")
+  paxsDeMonEvent(@CurrentPax() pax: Pax) {
+    return this.paxService.findAllForEventOverview(pax.eventId);
+  }
+
+  /**
+   * Tous les trajets de son évènement, en lecture seule : jamais les
+   * coordonnées des autres paxs, ni le commentaire interne d'un trajet ou
+   * d'une navette (réservés à l'organisation).
+   */
+  @UseGuards(PaxTokenGuard)
+  @Get("pax/moi/trajets")
+  trajetsDeMonEvent(@CurrentPax() pax: Pax) {
+    return this.trajetsService.findAllForEventOverview(pax.eventId);
   }
 
   /** Back-office : liste des paxs d'un évènement (inclut le jeton, pour renvoyer un lien perdu). */

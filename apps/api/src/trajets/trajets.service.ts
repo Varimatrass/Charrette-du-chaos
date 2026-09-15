@@ -74,6 +74,45 @@ export class TrajetsService {
     }));
   }
 
+  /**
+   * Vue "annuaire" des trajets de l'évènement, telle que vue par les autres
+   * paxs : le nom du pax concerné (jamais ses coordonnées), le libellé de
+   * la navette assignée s'il y en a une — jamais le commentaire du trajet
+   * ou de la navette, réservés à l'organisation.
+   */
+  async findAllForEventOverview(eventId: string) {
+    const trajets = await this.prisma.trajet.findMany({
+      where: { eventId },
+      include: {
+        pax: { select: { id: true, nom: true } },
+        navette: { select: { id: true, libelle: true, heureArriveeGare: true } },
+      },
+      orderBy: [{ jour: "asc" }, { heure: "asc" }],
+    });
+
+    return trajets.map(({ pax, navette, ...trajet }) => ({
+      id: trajet.id,
+      paxId: pax.id,
+      paxNom: pax.nom,
+      sens: trajet.sens,
+      mode: trajet.mode,
+      jour: trajet.jour,
+      heure: trajet.heure,
+      gare: trajet.gare,
+      statut: trajet.statut,
+      navetteId: navette?.id ?? null,
+      navetteLibelle: navette?.libelle ?? null,
+      niveauAttente: navette
+        ? calculerNiveauAttente(
+            // Cast sûr : voir le commentaire équivalent dans findAllForEvent ci-dessus.
+            trajet.sens as unknown as Sens,
+            trajet.heure,
+            navette.heureArriveeGare,
+          )
+        : null,
+    }));
+  }
+
   async assigner(id: string, dto: AssignerTrajetDto) {
     await this.findOneOrThrow(id);
     return this.prisma.trajet.update({

@@ -139,3 +139,42 @@ export interface DriverAvailabilitySlot {
   createdAt: string;
   updatedAt: string;
 }
+
+
+/**
+ * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais
+ * ses coordonnées de contact (email/téléphone) ni son jeton d'accès —
+ * seulement de quoi se coordonner (nom, discord, véhicule/permis/conduite,
+ * commentaire).
+ */
+export interface PaxOverview {
+  id: string;
+  nom: string;
+  discordHandle: string | null;
+  commentaire: string | null;
+  hasVehicle: boolean | null;
+  vehicleLendingMode: VehicleLendingMode | null;
+  hasDrivingLicense: boolean | null;
+  willingToDriveShuttle: boolean | null;
+}
+
+/**
+ * Vue "annuaire" d'un trajet pour les autres paxs de son évènement : le nom
+ * du pax concerné (jamais ses coordonnées), le libellé de la navette
+ * assignée s'il y en a une — jamais le commentaire du trajet ou de la
+ * navette, réservés à l'organisation.
+ */
+export interface TrajetOverview {
+  id: string;
+  paxId: string;
+  paxNom: string;
+  sens: Sens;
+  mode: ModeTransport | null;
+  jour: IsoDate | null;
+  heure: IsoTime | null;
+  gare: string | null;
+  statut: StatutTrajet;
+  navetteId: string | null;
+  navetteLibelle: string | null;
+  niveauAttente: NiveauAttente | null;
+}

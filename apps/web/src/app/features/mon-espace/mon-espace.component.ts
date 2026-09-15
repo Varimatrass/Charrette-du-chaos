@@ -11,8 +11,13 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { MatTableModule } from "@angular/material/table";
 import { DatePipe } from "@angular/common";
-import { ModeTransport, Sens, StatutTrajet } from "@desordre/shared-types";
-import type { NavetteAvecNomsPassagers, PassagerNom } from "@desordre/shared-types";
+import { ModeTransport, Sens, StatutTrajet, VehicleLendingMode } from "@desordre/shared-types";
+import type {
+  NavetteAvecNomsPassagers,
+  PassagerNom,
+  PaxOverview,
+  TrajetOverview,
+} from "@desordre/shared-types";
 import { ApiService, PaxAvecTrajets } from "../../core/services/api.service";
 
 interface TrajetFormGroup {
@@ -73,9 +78,16 @@ export class MonEspaceComponent {
   readonly navettes = signal<NavetteAvecNomsPassagers[]>([]);
   readonly colonnesNavettes = ["libelle", "sens", "jour", "heures", "conducteur", "places", "passagers"];
 
+  readonly paxsEvenement = signal<PaxOverview[]>([]);
+  readonly colonnesPaxs = ["nom", "discord", "vehicule", "commentaire"];
+
+  readonly trajetsEvenement = signal<TrajetOverview[]>([]);
+  readonly colonnesTrajets = ["pax", "sens", "mode", "quand", "statut", "navette"];
+
   readonly infosForm = new FormGroup({
     nom: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     contactEmail: new FormControl("", { nonNullable: true, validators: [Validators.email] }),
+    discordHandle: new FormControl("", { nonNullable: true }),
     contactTelephone: new FormControl("", { nonNullable: true }),
     commentaire: new FormControl("", { nonNullable: true }),
   });
@@ -97,6 +109,7 @@ export class MonEspaceComponent {
         this.infosForm.patchValue({
           nom: pax.nom,
           contactEmail: pax.contactEmail ?? "",
+          discordHandle: pax.discordHandle ?? "",
           contactTelephone: pax.contactTelephone ?? "",
           commentaire: pax.commentaire ?? "",
         });
@@ -125,11 +138,22 @@ export class MonEspaceComponent {
       },
     });
 
-    // Planning des navettes de l'évènement : indépendant du reste, une erreur ici
-    // ne doit pas empêcher d'afficher/modifier ses infos et ses trajets.
+    // Planning des navettes, annuaire des paxs et vue d'ensemble des trajets :
+    // trois chargements indépendants du reste, une erreur sur l'un d'eux ne
+    // doit pas empêcher d'afficher/modifier ses propres infos et trajets.
     this.api.listerNavettesMonEvent(this.token).subscribe({
       next: (navettes) => this.navettes.set(navettes),
       error: () => this.navettes.set([]),
+    });
+
+    this.api.listerPaxsMonEvent(this.token).subscribe({
+      next: (paxs) => this.paxsEvenement.set(paxs),
+      error: () => this.paxsEvenement.set([]),
+    });
+
+    this.api.listerTrajetsMonEvent(this.token).subscribe({
+      next: (trajets) => this.trajetsEvenement.set(trajets),
+      error: () => this.trajetsEvenement.set([]),
     });
   }
 
@@ -144,6 +168,51 @@ export class MonEspaceComponent {
 
   nomsPassagers(passagers: PassagerNom[]): string {
     return passagers.map((p) => p.nom).join(", ");
+  }
+
+  /** Résumé lisible du bloc véhicule/conduite d'un pax pour l'annuaire. */
+  vehiculeResume(p: PaxOverview): string {
+    if (p.hasVehicle === true) {
+      const parts: string[] = ["a une voiture"];
+      if (p.vehicleLendingMode === VehicleLendingMode.AVAILABLE_ANY_DRIVER) {
+        parts.push("prête même si iel ne conduit pas");
+      } else if (p.vehicleLendingMode === VehicleLendingMode.ONLY_IF_OWNER_DRIVES) {
+        parts.push("prête seulement si iel conduit");
+      }
+      if (p.willingToDriveShuttle) parts.push("partant·e pour conduire");
+      return parts.join(", ");
+    }
+    if (p.hasVehicle === false) {
+      const parts: string[] = [];
+      if (p.hasDrivingLicense) parts.push("a le permis");
+      if (p.willingToDriveShuttle) parts.push("partant·e pour conduire");
+      return parts.length > 0 ? parts.join(", ") : "—";
+    }
+    return "—";
+  }
+
+  libelleMode(mode: ModeTransport | null): string {
+    switch (mode) {
+      case ModeTransport.TRAIN:
+        return "Train";
+      case ModeTransport.COVOITURAGE:
+        return "Covoiturage";
+      case ModeTransport.AUTRE:
+        return "Autre";
+      default:
+        return "?";
+    }
+  }
+
+  libelleStatut(statut: StatutTrajet): string {
+    switch (statut) {
+      case StatutTrajet.ASSIGNE:
+        return "Assigné";
+      case StatutTrajet.A_REVERIFIER:
+        return "À revérifier";
+      default:
+        return "En attente";
+    }
   }
 
   statutTrajet(sens: Sens): StatutTrajet | null {

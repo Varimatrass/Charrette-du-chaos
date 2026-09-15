@@ -97,6 +97,30 @@ export class PaxService {
     return pax;
   }
 
+  /**
+   * Vue "annuaire" des paxs de l'évènement, telle que vue par les autres
+   * paxs : jamais l'email, le téléphone ou le jeton d'accès de qui que ce
+   * soit — juste de quoi se coordonner (nom, discord, véhicule/permis/conduite).
+   * Champs sélectionnés explicitement plutôt que filtrés après coup, pour
+   * qu'un futur champ sensible ajouté à Pax ne fuite pas ici par défaut.
+   */
+  findAllForEventOverview(eventId: string) {
+    return this.prisma.pax.findMany({
+      where: { eventId },
+      select: {
+        id: true,
+        nom: true,
+        discordHandle: true,
+        commentaire: true,
+        hasVehicle: true,
+        vehicleLendingMode: true,
+        hasDrivingLicense: true,
+        willingToDriveShuttle: true,
+      },
+      orderBy: { nom: "asc" },
+    });
+  }
+
   private toSubmissionResult(pax: Pax): PaxSubmissionResult {
     const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:4200";
     return {
