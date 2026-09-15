@@ -79,6 +79,7 @@ export interface CreateNavetteInput {
   heureRetourLieu?: string;
   capacite: number;
   commentaire?: string;
+  driverPaxId?: string;
 }
 
 export type UpdateNavetteInput = Partial<Omit<CreateNavetteInput, "eventId">>;

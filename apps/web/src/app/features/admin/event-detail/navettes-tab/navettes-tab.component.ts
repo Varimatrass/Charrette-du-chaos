@@ -7,7 +7,7 @@ import { MatInputModule } from "@angular/material/input";
 import { MatSelectModule } from "@angular/material/select";
 import { MatTableModule } from "@angular/material/table";
 import { Sens } from "@desordre/shared-types";
-import type { Navette, NavetteAvecPassagers } from "@desordre/shared-types";
+import type { Navette, NavetteAvecPassagers, PaxAdmin } from "@desordre/shared-types";
 import { ApiService } from "../../../../core/services/api.service";
 
 @Component({
@@ -35,6 +35,8 @@ export class NavettesTabComponent implements OnChanges {
   readonly navettes = signal<(Navette & { placesRestantes: number })[]>([]);
   readonly afficherFormulaire = signal(false);
   readonly navetteOuverte = signal<NavetteAvecPassagers | null>(null);
+  /** Pour le sélecteur "conducteur·ice lié·e à un pax" du formulaire de création. */
+  readonly paxsEvent = signal<PaxAdmin[]>([]);
 
   readonly form = new FormGroup({
     libelle: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
@@ -47,14 +49,28 @@ export class NavettesTabComponent implements OnChanges {
     heureRetourLieu: new FormControl("", { nonNullable: true }),
     capacite: new FormControl(4, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
     commentaire: new FormControl("", { nonNullable: true }),
+    driverPaxId: new FormControl("", { nonNullable: true }),
   });
 
   ngOnChanges(): void {
     this.charger();
+    this.api.listerPaxsEvent(this.eventId()).subscribe((paxs) => this.paxsEvent.set(paxs));
   }
 
   charger(): void {
     this.api.listerNavettes(this.eventId()).subscribe((navettes) => this.navettes.set(navettes));
+  }
+
+  /**
+   * Quand l'admin choisit un pax dans le sélecteur, on pré-remplit le champ
+   * texte "conducteur" avec son nom, par confort — mais il reste éditable
+   * librement ensuite (ex: pour préciser "Sophie (voiture rouge)").
+   */
+  surSelectionConducteur(paxId: string): void {
+    const pax = this.paxsEvent().find((p) => p.id === paxId);
+    if (pax && !this.form.controls.conducteur.value) {
+      this.form.controls.conducteur.setValue(pax.nom);
+    }
   }
 
   creer(): void {
@@ -76,6 +92,7 @@ export class NavettesTabComponent implements OnChanges {
         heureRetourLieu: valeurs.heureRetourLieu || undefined,
         capacite: valeurs.capacite,
         commentaire: valeurs.commentaire || undefined,
+        driverPaxId: valeurs.driverPaxId || undefined,
       })
       .subscribe(() => {
         this.form.reset({ sens: Sens.ALLER, capacite: 4 });

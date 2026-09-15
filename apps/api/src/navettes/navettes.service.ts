@@ -23,6 +23,7 @@ export class NavettesService {
         heureRetourLieu: dto.heureRetourLieu,
         capacite: dto.capacite,
         commentaire: dto.commentaire,
+        driverPaxId: dto.driverPaxId,
       },
     });
   }
@@ -47,19 +48,34 @@ export class NavettesService {
    * évènement en autogestion, savoir qui conduit et qui est dans la navette
    * est utile aux paxs ; leurs coordonnées de contact restent privées entre
    * elleux.
+   *
+   * Exception ciblée (Phase 4) : le téléphone du/de la conducteur·ice
+   * devient visible, mais UNIQUEMENT pour les pax qui sont eux/elles-mêmes
+   * dans CETTE navette précise (`requestingPaxId` parmi les passager·es), et
+   * seulement si un pax est identifié comme conducteur·ice (`driverPaxId`).
+   * Tout le monde d'autre continue à ne voir que son nom, comme avant.
    */
-  async findAllForEventPourPax(eventId: string) {
+  async findAllForEventPourPax(eventId: string, requestingPaxId: string) {
     const navettes = await this.prisma.navette.findMany({
       where: { eventId },
-      include: { trajets: { include: { pax: { select: { id: true, nom: true } } } } },
+      include: {
+        trajets: { include: { pax: { select: { id: true, nom: true } } } },
+        driverPax: { select: { contactTelephone: true } },
+      },
       orderBy: [{ jour: 'asc' }, { heureDepart: 'asc' }],
     });
 
-    return navettes.map(({ trajets, ...navette }) => ({
-      ...navette,
-      placesRestantes: navette.capacite - trajets.length,
-      passagers: trajets.map((trajet) => ({ paxId: trajet.pax.id, nom: trajet.pax.nom })),
-    }));
+    return navettes.map(({ trajets, driverPax, ...navette }) => {
+      const passagers = trajets.map((trajet) => ({ paxId: trajet.pax.id, nom: trajet.pax.nom }));
+      const estCoPassager = passagers.some((passager) => passager.paxId === requestingPaxId);
+
+      return {
+        ...navette,
+        placesRestantes: navette.capacite - trajets.length,
+        passagers,
+        driverContactPhone: estCoPassager ? (driverPax?.contactTelephone ?? null) : null,
+      };
+    });
   }
 
   async findOne(id: string) {
@@ -106,6 +122,10 @@ export class NavettesService {
         }),
         ...(dto.capacite !== undefined && { capacite: dto.capacite }),
         ...(dto.commentaire !== undefined && { commentaire: dto.commentaire }),
+        // Le lien vers un pax est une clé étrangère : contrairement aux
+        // autres champs texte optionnels ci-dessus, une chaîne vide ne veut
+        // rien dire pour Postgres — on la traite comme "délier" (null).
+        ...(dto.driverPaxId !== undefined && { driverPaxId: dto.driverPaxId || null }),
       },
     });
   }

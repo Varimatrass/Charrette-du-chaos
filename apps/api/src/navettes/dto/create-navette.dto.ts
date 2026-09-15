@@ -44,4 +44,8 @@ export class CreateNavetteDto implements CreateNavetteInput {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  @IsOptional()
+  @IsUUID()
+  driverPaxId?: string;
 }

@@ -83,6 +83,11 @@ model Pax {
   event                   Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   trajets                 Trajet[]
   driverAvailabilitySlots DriverAvailabilitySlot[]
+  // Navettes dont ce pax est le/la conducteur·ice identifié·e (voir
+  // Navette.driverPaxId) : permet d'aller chercher son contactTelephone
+  // pour l'afficher aux co-passager·es de CES navettes précises, sans le
+  // dupliquer sur la navette elle-même.
+  navettesConduites       Navette[]
 
   @@index([eventId])
   @@map("paxs")
@@ -94,6 +99,12 @@ model Navette {
   libelle          String
   jour             DateTime @db.Date
   sens             Sens
+  // Nom affiché du/de la conducteur·ice, texte libre : reste utilisable
+  // tel quel pour un·e conducteur·ice qui n'est pas inscrit·e comme pax
+  // (ex: un·e proche qui vient juste déposer/récupérer sans participer à
+  // l'évènement). Quand `driverPaxId` est renseigné, l'admin garde la main
+  // pour le faire correspondre au nom du pax, mais rien ne les lie en base
+  // à part ce champ texte + la relation ci-dessous.
   conducteur       String?
   vehicule         String?
   heureDepart      String   @map("heure_depart") // "HH:mm"
@@ -101,13 +112,21 @@ model Navette {
   heureRetourLieu  String?  @map("heure_retour_lieu") // "HH:mm"
   capacite         Int
   commentaire      String?
+  // Lien optionnel vers le pax qui conduit réellement cette navette : c'est
+  // ce qui permet d'exposer son contactTelephone aux pax qui sont dedans
+  // (voir NavettesService.findAllForEventPourPax), sans dupliquer le
+  // numéro sur la navette elle-même. `null` si le/la conducteur·ice n'est
+  // pas un pax de l'évènement — dans ce cas, pas de téléphone à afficher.
+  driverPaxId      String?  @map("driver_pax_id")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  trajets Trajet[]
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trajets   Trajet[]
+  driverPax Pax?     @relation(fields: [driverPaxId], references: [id], onDelete: SetNull)
 
   @@index([eventId])
+  @@index([driverPaxId])
   @@map("navettes")
 }
 

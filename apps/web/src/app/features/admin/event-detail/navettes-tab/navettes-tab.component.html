@@ -26,6 +26,19 @@
       <input matInput formControlName="conducteur" />
     </mat-form-field>
     <mat-form-field appearance="outline">
+      <mat-label>Lié·e à un pax (optionnel)</mat-label>
+      <mat-select
+        formControlName="driverPaxId"
+        (selectionChange)="surSelectionConducteur($event.value)"
+      >
+        <mat-option value="">Non renseigné</mat-option>
+        @for (pax of paxsEvent(); track pax.id) {
+          <mat-option [value]="pax.id">{{ pax.nom }}</mat-option>
+        }
+      </mat-select>
+      <mat-hint>Permet d'afficher son téléphone aux pax de cette navette.</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
       <mat-label>Véhicule</mat-label>
       <input matInput formControlName="vehicule" />
     </mat-form-field>

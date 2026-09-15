@@ -56,6 +56,10 @@
                   @if (n.vehicule) {
                     <span class="vehicule">({{ n.vehicule }})</span>
                   }
+                  @if (n.driverContactPhone) {
+                    <br />
+                    <span class="telephone-conducteur">📞 {{ n.driverContactPhone }}</span>
+                  }
                 </td>
               </ng-container>
               <ng-container matColumnDef="places">

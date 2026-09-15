@@ -80,6 +80,11 @@ export interface Navette {
   heureRetourLieu: IsoTime | null;
   capacite: number;
   commentaire: string | null;
+  // Pax identifié comme le/la conducteur·ice réel·le de cette navette,
+  // `null` si non renseigné ou si le/la conducteur·ice n'est pas un pax de
+  // l'évènement. Permet d'aller chercher son contactTelephone pour
+  // l'exposer aux co-passager·es (voir NavetteAvecNomsPassagers).
+  driverPaxId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,9 +117,16 @@ export interface PassagerNom {
  * Vue d'une navette pour les paxs : conducteur·ice/véhicule (déjà sur
  * `Navette`), places restantes, et noms des co-passager·es — jamais leurs
  * coordonnées de contact.
+ *
+ * Exception ciblée (Phase 4) : `driverContactPhone` porte le téléphone du
+ * pax identifié comme conducteur·ice — mais UNIQUEMENT quand le pax qui
+ * consulte cette navette en fait lui/elle-même partie (voir le calcul côté
+ * `NavettesService.findAllForEventPourPax`). `null` pour tout le monde
+ * d'autre, ou si aucun pax n'est identifié comme conducteur·ice.
  */
 export interface NavetteAvecNomsPassagers extends NavetteAvecPlacesRestantes {
   passagers: PassagerNom[];
+  driverContactPhone: string | null;
 }
 
 /** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */

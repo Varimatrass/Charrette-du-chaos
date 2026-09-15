@@ -41,11 +41,14 @@ export class PaxController {
    * Planning des navettes de son évènement, en lecture seule : conducteur·ice,
    * véhicule, horaires, places restantes, et noms des co-passager·es (jamais
    * leurs coordonnées de contact — voir NavettesService.findAllForEventPourPax).
+   * Exception : le téléphone du/de la conducteur·ice devient visible, mais
+   * seulement pour les pax qui sont dans CETTE navette (d'où le `pax.id`
+   * passé ici, pour que le service sache qui demande).
    */
   @UseGuards(PaxTokenGuard)
   @Get("pax/moi/navettes")
   navettesDeMonEvent(@CurrentPax() pax: Pax) {
-    return this.navettesService.findAllForEventPourPax(pax.eventId);
+    return this.navettesService.findAllForEventPourPax(pax.eventId, pax.id);
   }
 
   /**
