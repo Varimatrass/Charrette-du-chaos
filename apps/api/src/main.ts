@@ -25,4 +25,14 @@ async function bootstrap() {
   // eslint-disable-next-line no-console
   console.log(`API Désordre Navettes démarrée sur http://localhost:${port}`);
 }
-bootstrap();
+
+// Si le démarrage échoue (ex: base de données injoignable — voir
+// PrismaService.onModuleInit), on ne veut surtout pas laisser un process
+// "à moitié démarré" tourner en silence : on logge clairement l'erreur et on
+// quitte avec un code non nul, pour que ce soit visible immédiatement dans le
+// terminal (et détectable par un outil de supervision en prod).
+bootstrap().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error("Échec du démarrage de l'API :", error);
+  process.exit(1);
+});
