@@ -7,7 +7,12 @@ import { MatInputModule } from "@angular/material/input";
 import { MatSelectModule } from "@angular/material/select";
 import { MatTableModule } from "@angular/material/table";
 import { Sens } from "@desordre/shared-types";
-import type { Navette, NavetteAvecPassagers, PaxAdmin } from "@desordre/shared-types";
+import type {
+  DriverAvailabilitySlotAvecPax,
+  Navette,
+  NavetteAvecPassagers,
+  PaxAdmin,
+} from "@desordre/shared-types";
 import { ApiService } from "../../../../core/services/api.service";
 
 @Component({
@@ -37,6 +42,8 @@ export class NavettesTabComponent implements OnChanges {
   readonly navetteOuverte = signal<NavetteAvecPassagers | null>(null);
   /** Pour le sélecteur "conducteur·ice lié·e à un pax" du formulaire. */
   readonly paxsEvent = signal<PaxAdmin[]>([]);
+  /** Créneaux dispo déclarés par les pax partant·es pour conduire, pour les suggérer en priorité. */
+  readonly disponibilites = signal<DriverAvailabilitySlotAvecPax[]>([]);
   /** `null` = formulaire de création ; sinon l'id de la navette en cours de modification. */
   readonly navetteEnEdition = signal<string | null>(null);
 
@@ -57,6 +64,7 @@ export class NavettesTabComponent implements OnChanges {
   ngOnChanges(): void {
     this.charger();
     this.api.listerPaxsEvent(this.eventId()).subscribe((paxs) => this.paxsEvent.set(paxs));
+    this.api.listerDisponibilites(this.eventId()).subscribe((d) => this.disponibilites.set(d));
   }
 
   charger(): void {
@@ -73,6 +81,18 @@ export class NavettesTabComponent implements OnChanges {
     if (pax && !this.form.controls.conducteur.value) {
       this.form.controls.conducteur.setValue(pax.nom);
     }
+  }
+
+  /**
+   * Pax ayant déclaré une disponibilité pour conduire au jour actuellement
+   * choisi dans le formulaire — une suggestion, pas un filtre : le
+   * sélecteur garde toujours tous les pax en dessous, au cas où les
+   * disponibilités déclarées ne seraient plus à jour.
+   */
+  paxDisponiblesPourLeJourChoisi(): DriverAvailabilitySlotAvecPax[] {
+    const jour = this.form.controls.jour.value;
+    if (!jour) return [];
+    return this.disponibilites().filter((d) => d.day.slice(0, 10) === jour);
   }
 
   /** Ouvre le formulaire vide, prêt pour une nouvelle navette. */

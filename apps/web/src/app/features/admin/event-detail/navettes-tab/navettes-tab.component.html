@@ -33,9 +33,23 @@
         (selectionChange)="surSelectionConducteur($event.value)"
       >
         <mat-option value="">Non renseigné</mat-option>
-        @for (pax of paxsEvent(); track pax.id) {
-          <mat-option [value]="pax.id">{{ pax.nom }}</mat-option>
+        @if (paxDisponiblesPourLeJourChoisi().length > 0) {
+          <mat-optgroup label="Partant·es ce jour-là">
+            @for (d of paxDisponiblesPourLeJourChoisi(); track d.id) {
+              <mat-option [value]="d.pax.id">
+                {{ d.pax.nom }}
+                @if (d.startTime || d.endTime) {
+                  ({{ d.startTime || "?" }}–{{ d.endTime || "?" }})
+                }
+              </mat-option>
+            }
+          </mat-optgroup>
         }
+        <mat-optgroup label="Tous les pax">
+          @for (pax of paxsEvent(); track pax.id) {
+            <mat-option [value]="pax.id">{{ pax.nom }}</mat-option>
+          }
+        </mat-optgroup>
       </mat-select>
       <mat-hint>Permet d'afficher son téléphone aux pax de cette navette.</mat-hint>
     </mat-form-field>

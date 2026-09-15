@@ -152,6 +152,20 @@ export interface DriverAvailabilitySlot {
   updatedAt: string;
 }
 
+/**
+ * Vue back-office d'un créneau de disponibilité, avec de quoi identifier et
+ * contacter le pax directement depuis l'écran de création d'une navette
+ * (l'admin a de toute façon accès à ces infos ailleurs, pas une nouvelle
+ * fuite de confidentialité).
+ */
+export interface DriverAvailabilitySlotAvecPax extends DriverAvailabilitySlot {
+  pax: {
+    id: string;
+    nom: string;
+    contactTelephone: string | null;
+  };
+}
+
 
 /**
  * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais

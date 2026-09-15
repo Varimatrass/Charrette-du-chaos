@@ -260,6 +260,64 @@
           </form>
         </mat-card>
       }
+
+      @if (pax()?.willingToDriveShuttle) {
+        <mat-card class="carte">
+          <h2>Mes disponibilités pour conduire une navette</h2>
+          <p class="aide">
+            Tu as dit être partant·e pour conduire une navette — indique ici les jours (et
+            créneaux, si tu les connais déjà) où ça te conviendrait. L'organisation pioche dedans
+            pour te proposer une navette, mais ça reste indicatif : tu peux ajouter ou retirer un
+            créneau à tout moment.
+          </p>
+
+          @if (mesDisponibilites().length > 0) {
+            <ul class="liste-disponibilites">
+              @for (d of mesDisponibilites(); track d.id) {
+                <li>
+                  {{ d.day | date: "d MMM" }}
+                  @if (d.startTime || d.endTime) {
+                    ({{ d.startTime || "?" }}–{{ d.endTime || "?" }})
+                  }
+                  @if (d.comment) {
+                    — {{ d.comment }}
+                  }
+                  <button
+                    mat-icon-button
+                    type="button"
+                    aria-label="Supprimer ce créneau"
+                    (click)="supprimerDisponibilite(d.id)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <form [formGroup]="disponibiliteForm" (ngSubmit)="ajouterDisponibilite()">
+            <mat-form-field appearance="outline">
+              <mat-label>Jour</mat-label>
+              <input matInput type="date" formControlName="day" required />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>À partir de (optionnel)</mat-label>
+              <input matInput type="time" formControlName="startTime" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Jusqu'à (optionnel)</mat-label>
+              <input matInput type="time" formControlName="endTime" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Commentaire</mat-label>
+              <input matInput formControlName="comment" />
+            </mat-form-field>
+            <button mat-flat-button color="primary" type="submit" [disabled]="enregistrementDisponibilite()">
+              Ajouter ce créneau
+            </button>
+          </form>
+        </mat-card>
+      }
     </div>
   }
 </div>

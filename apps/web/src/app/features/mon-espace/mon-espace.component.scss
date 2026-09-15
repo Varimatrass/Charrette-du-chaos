@@ -83,3 +83,16 @@ tr.ma-navette {
   color: rgba(0, 0, 0, 0.6);
   font-size: 0.85rem;
 }
+
+.liste-disponibilites {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+  }
+}

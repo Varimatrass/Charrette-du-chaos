@@ -13,6 +13,7 @@ import { MatTableModule } from "@angular/material/table";
 import { DatePipe } from "@angular/common";
 import { ModeTransport, Sens, StatutTrajet, VehicleLendingMode } from "@desordre/shared-types";
 import type {
+  DriverAvailabilitySlot,
   NavetteAvecNomsPassagers,
   PassagerNom,
   PaxOverview,
@@ -84,6 +85,16 @@ export class MonEspaceComponent {
   readonly trajetsEvenement = signal<TrajetOverview[]>([]);
   readonly colonnesTrajets = ["pax", "sens", "mode", "quand", "statut", "navette"];
 
+  readonly mesDisponibilites = signal<DriverAvailabilitySlot[]>([]);
+  readonly enregistrementDisponibilite = signal(false);
+
+  readonly disponibiliteForm = new FormGroup({
+    day: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    startTime: new FormControl("", { nonNullable: true }),
+    endTime: new FormControl("", { nonNullable: true }),
+    comment: new FormControl("", { nonNullable: true }),
+  });
+
   readonly infosForm = new FormGroup({
     nom: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     contactEmail: new FormControl("", { nonNullable: true, validators: [Validators.email] }),
@@ -154,6 +165,15 @@ export class MonEspaceComponent {
     this.api.listerTrajetsMonEvent(this.token).subscribe({
       next: (trajets) => this.trajetsEvenement.set(trajets),
       error: () => this.trajetsEvenement.set([]),
+    });
+
+    this.chargerMesDisponibilites();
+  }
+
+  private chargerMesDisponibilites(): void {
+    this.api.listerMesDisponibilites(this.token).subscribe({
+      next: (slots) => this.mesDisponibilites.set(slots),
+      error: () => this.mesDisponibilites.set([]),
     });
   }
 
@@ -239,6 +259,44 @@ export class MonEspaceComponent {
         this.enregistrementInfos.set(false);
         this.snackBar.open("Échec de l'enregistrement, réessaie.", undefined, { duration: 3000 });
       },
+    });
+  }
+
+  ajouterDisponibilite(): void {
+    if (this.disponibiliteForm.invalid) {
+      this.disponibiliteForm.markAllAsTouched();
+      return;
+    }
+    const valeurs = this.disponibiliteForm.getRawValue();
+    this.enregistrementDisponibilite.set(true);
+    this.api
+      .ajouterMaDisponibilite(this.token, {
+        day: valeurs.day,
+        startTime: valeurs.startTime || undefined,
+        endTime: valeurs.endTime || undefined,
+        comment: valeurs.comment || undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.enregistrementDisponibilite.set(false);
+          this.disponibiliteForm.reset({ day: "", startTime: "", endTime: "", comment: "" });
+          this.snackBar.open("Créneau ajouté.", undefined, { duration: 2000 });
+          this.chargerMesDisponibilites();
+        },
+        error: () => {
+          this.enregistrementDisponibilite.set(false);
+          this.snackBar.open("Échec de l'ajout, réessaie.", undefined, { duration: 3000 });
+        },
+      });
+  }
+
+  supprimerDisponibilite(id: string): void {
+    this.api.supprimerMaDisponibilite(this.token, id).subscribe({
+      next: () => {
+        this.snackBar.open("Créneau supprimé.", undefined, { duration: 2000 });
+        this.chargerMesDisponibilites();
+      },
+      error: () => this.snackBar.open("Échec de la suppression, réessaie.", undefined, { duration: 3000 }),
     });
   }
 

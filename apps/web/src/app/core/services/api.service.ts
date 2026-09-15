@@ -3,9 +3,12 @@ import { Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import type {
   AssignerTrajetInput,
+  CreateDriverAvailabilitySlotInput,
   CreateEventInput,
   CreateNavetteInput,
   CreatePaxInput,
+  DriverAvailabilitySlot,
+  DriverAvailabilitySlotAvecPax,
   Event,
   Navette,
   NavetteAvecNomsPassagers,
@@ -106,6 +109,29 @@ export class ApiService {
     });
   }
 
+  // ---- Disponibilités conducteur·ice (self-service) ----
+
+  listerMesDisponibilites(token: string): Observable<DriverAvailabilitySlot[]> {
+    return this.http.get<DriverAvailabilitySlot[]>(`${this.base}/pax/moi/disponibilites`, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
+  ajouterMaDisponibilite(
+    token: string,
+    input: CreateDriverAvailabilitySlotInput,
+  ): Observable<DriverAvailabilitySlot> {
+    return this.http.post<DriverAvailabilitySlot>(`${this.base}/pax/moi/disponibilites`, input, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
+  supprimerMaDisponibilite(token: string, id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/pax/moi/disponibilites/${id}`, {
+      headers: { "x-pax-token": token },
+    });
+  }
+
   // ---- Pax (back-office) ----
 
   listerPaxsEvent(eventId: string): Observable<PaxAdmin[]> {
@@ -115,6 +141,15 @@ export class ApiService {
   rechercherPax(eventId: string, nom: string): Observable<PaxAdmin[]> {
     return this.http.get<PaxAdmin[]>(`${this.base}/admin/pax/rechercher`, {
       params: { eventId, nom },
+    });
+  }
+
+  // ---- Disponibilités conducteur·ice (back-office) ----
+
+  /** Pour proposer en priorité, à la création/modification d'une navette, les pax déjà partant·es. */
+  listerDisponibilites(eventId: string): Observable<DriverAvailabilitySlotAvecPax[]> {
+    return this.http.get<DriverAvailabilitySlotAvecPax[]>(`${this.base}/admin/disponibilites`, {
+      params: { eventId },
     });
   }
 
