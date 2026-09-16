@@ -13,7 +13,13 @@ import { AdminAuthService } from "../../../core/services/admin-auth.service";
 @Component({
   selector: "app-admin-login",
   standalone: true,
-  imports: [ReactiveFormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+  ],
   templateUrl: "./admin-login.component.html",
   styleUrl: "./admin-login.component.scss",
 })

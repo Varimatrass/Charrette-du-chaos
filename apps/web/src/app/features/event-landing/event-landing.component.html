@@ -3,7 +3,8 @@
     @if (event(); as e) {
       <h1>{{ e.nom }}</h1>
       <p class="sous-titre">
-        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} — {{ e.lieu }}
+        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} —
+        {{ e.lieu }}
       </p>
     }
 
@@ -32,7 +33,9 @@
       </mat-form-field>
 
       <div class="choix">
-        <button mat-flat-button color="primary" type="button" (click)="seConnecter()">Continuer</button>
+        <button mat-flat-button color="primary" type="button" (click)="seConnecter()">
+          Continuer
+        </button>
         <button mat-button type="button" (click)="annulerConnexion()">Retour</button>
       </div>
     }

@@ -177,17 +177,19 @@ export class InscriptionComponent {
           !valeurs.mode && !valeurs.jour && !valeurs.heure && !valeurs.gare && !valeurs.commentaire;
         if (rienRenseigne) return null;
 
-        return this.api
-          .enregistrerMonTrajet(token, sens, {
-            mode: valeurs.mode ?? undefined,
-            jour: valeurs.jour || undefined,
-            heure: valeurs.heure || undefined,
-            gare: valeurs.gare || undefined,
-            commentaire: valeurs.commentaire || undefined,
-          })
-          // Un trajet qui échoue à s'enregistrer ne doit pas bloquer
-          // l'inscription : le pax pourra toujours le compléter ensuite.
-          .pipe(catchError(() => of(null)));
+        return (
+          this.api
+            .enregistrerMonTrajet(token, sens, {
+              mode: valeurs.mode ?? undefined,
+              jour: valeurs.jour || undefined,
+              heure: valeurs.heure || undefined,
+              gare: valeurs.gare || undefined,
+              commentaire: valeurs.commentaire || undefined,
+            })
+            // Un trajet qui échoue à s'enregistrer ne doit pas bloquer
+            // l'inscription : le pax pourra toujours le compléter ensuite.
+            .pipe(catchError(() => of(null)))
+        );
       })
       .filter((appel) => appel !== null);
 

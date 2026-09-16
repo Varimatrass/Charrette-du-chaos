@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Sens } from '@desordre/shared-types';
-import { calculerNiveauAttente } from '../common/attente.util';
-import { CreateNavetteDto } from './dto/create-navette.dto';
-import { UpdateNavetteDto } from './dto/update-navette.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { Sens } from "@desordre/shared-types";
+import { calculerNiveauAttente } from "../common/attente.util";
+import { CreateNavetteDto } from "./dto/create-navette.dto";
+import { UpdateNavetteDto } from "./dto/update-navette.dto";
 
 @Injectable()
 export class NavettesService {
@@ -32,7 +32,7 @@ export class NavettesService {
     const navettes = await this.prisma.navette.findMany({
       where: { eventId },
       include: { trajets: true },
-      orderBy: [{ jour: 'asc' }, { heureDepart: 'asc' }],
+      orderBy: [{ jour: "asc" }, { heureDepart: "asc" }],
     });
 
     return navettes.map(({ trajets, ...navette }) => ({
@@ -62,7 +62,7 @@ export class NavettesService {
         trajets: { include: { pax: { select: { id: true, nom: true } } } },
         driverPax: { select: { contactTelephone: true } },
       },
-      orderBy: [{ jour: 'asc' }, { heureDepart: 'asc' }],
+      orderBy: [{ jour: "asc" }, { heureDepart: "asc" }],
     });
 
     return navettes.map(({ trajets, driverPax, ...navette }) => {
@@ -83,7 +83,7 @@ export class NavettesService {
       where: { id },
       include: { trajets: { include: { pax: true } } },
     });
-    if (!navette) throw new NotFoundException('Navette introuvable');
+    if (!navette) throw new NotFoundException("Navette introuvable");
 
     const { trajets, ...rest } = navette;
     const passagers = trajets.map((trajet) => ({
@@ -132,7 +132,7 @@ export class NavettesService {
 
   private async ensureExists(id: string) {
     const navette = await this.prisma.navette.findUnique({ where: { id } });
-    if (!navette) throw new NotFoundException('Navette introuvable');
+    if (!navette) throw new NotFoundException("Navette introuvable");
     return navette;
   }
 }

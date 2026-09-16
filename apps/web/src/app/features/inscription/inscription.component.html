@@ -5,14 +5,15 @@
     @if (event(); as e) {
       <h1>{{ e.nom }}</h1>
       <p class="sous-titre">
-        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} — {{ e.lieu }}
+        Du {{ e.dateDebut | date: "d MMMM" }} au {{ e.dateFin | date: "d MMMM yyyy" }} —
+        {{ e.lieu }}
       </p>
     }
 
     <h2>Inscription transport</h2>
     <p>
-      Tu pourras revenir modifier ou compléter tes infos et tes trajets aussi souvent que
-      nécessaire grâce au lien personnel qui te sera donné juste après.
+      Tu pourras revenir modifier ou compléter tes infos et tes trajets aussi souvent que nécessaire
+      grâce au lien personnel qui te sera donné juste après.
     </p>
 
     @if (erreur()) {
@@ -153,7 +154,13 @@
 
         <div class="actions">
           <button mat-button type="button" matStepperPrevious>Retour</button>
-          <button mat-flat-button color="primary" type="button" [disabled]="enCours()" (click)="soumettre()">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="enCours()"
+            (click)="soumettre()"
+          >
             @if (enCours()) {
               <mat-spinner diameter="20"></mat-spinner>
             } @else {

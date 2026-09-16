@@ -1,4 +1,12 @@
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 import { VehicleLendingMode } from "@desordre/shared-types";
 import type { CreatePaxInput } from "@desordre/shared-types";
 

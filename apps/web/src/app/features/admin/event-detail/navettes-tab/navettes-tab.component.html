@@ -1,12 +1,18 @@
 <div class="entete">
-  <button mat-flat-button color="primary" (click)="afficherFormulaire() ? annulerEdition() : ouvrirCreation()">
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="afficherFormulaire() ? annulerEdition() : ouvrirCreation()"
+  >
     {{ afficherFormulaire() ? "Annuler" : "Nouvelle navette" }}
   </button>
 </div>
 
 @if (afficherFormulaire()) {
   <form [formGroup]="form" (ngSubmit)="soumettre()" class="formulaire">
-    <h3 class="pleine-largeur">{{ navetteEnEdition() ? "Modifier la navette" : "Nouvelle navette" }}</h3>
+    <h3 class="pleine-largeur">
+      {{ navetteEnEdition() ? "Modifier la navette" : "Nouvelle navette" }}
+    </h3>
     <mat-form-field appearance="outline">
       <mat-label>Libellé</mat-label>
       <input matInput formControlName="libelle" placeholder="Navette 1 aller vendredi 14h45" />

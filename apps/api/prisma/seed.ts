@@ -165,7 +165,12 @@ async function main(): Promise<void> {
           navetteId: navetteAllerMatin.id,
           statut: "ASSIGNE",
         },
-        { sens: "RETOUR", mode: "COVOITURAGE", jour: JOUR_RETOUR, commentaire: "Repart avec Fanta." },
+        {
+          sens: "RETOUR",
+          mode: "COVOITURAGE",
+          jour: JOUR_RETOUR,
+          commentaire: "Repart avec Fanta.",
+        },
       ],
     },
     {
@@ -173,7 +178,13 @@ async function main(): Promise<void> {
       contactEmail: "camille.test@example.com",
       trajets: [
         // Pas encore assigné·e -> reste en "EN_ATTENTE", visible dans la liste des demandes.
-        { sens: "ALLER", mode: "TRAIN", jour: JOUR_ALLER, heure: "09:10", gare: "Gare de Testville" },
+        {
+          sens: "ALLER",
+          mode: "TRAIN",
+          jour: JOUR_ALLER,
+          heure: "09:10",
+          gare: "Gare de Testville",
+        },
       ],
     },
     {

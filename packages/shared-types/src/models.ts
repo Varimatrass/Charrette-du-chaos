@@ -134,7 +134,6 @@ export interface NavetteAvecPassagers extends NavetteAvecPlacesRestantes {
   passagers: TrajetAvecPax[];
 }
 
-
 /**
  * Créneau où un·e pax ayant accepté de conduire des navettes se déclare
  * disponible. Sert de base aux admins pour créer les navettes avec un·e
@@ -165,7 +164,6 @@ export interface DriverAvailabilitySlotAvecPax extends DriverAvailabilitySlot {
     contactTelephone: string | null;
   };
 }
-
 
 /**
  * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais

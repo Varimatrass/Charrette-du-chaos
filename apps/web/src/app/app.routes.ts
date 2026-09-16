@@ -6,7 +6,9 @@ export const routes: Routes = [
   {
     path: "e/:eventId",
     loadComponent: () =>
-      import("./features/event-landing/event-landing.component").then((m) => m.EventLandingComponent),
+      import("./features/event-landing/event-landing.component").then(
+        (m) => m.EventLandingComponent,
+      ),
   },
   {
     path: "e/:eventId/inscription",

@@ -17,7 +17,14 @@ import { ApiService } from "../../core/services/api.service";
 @Component({
   selector: "app-event-landing",
   standalone: true,
-  imports: [DatePipe, ReactiveFormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    DatePipe,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+  ],
   templateUrl: "./event-landing.component.html",
   styleUrl: "./event-landing.component.scss",
 })

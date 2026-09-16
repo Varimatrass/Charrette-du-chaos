@@ -49,14 +49,20 @@ export class NavettesTabComponent implements OnChanges {
 
   readonly form = new FormGroup({
     libelle: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    sens: new FormControl<Sens>(Sens.ALLER, { nonNullable: true, validators: [Validators.required] }),
+    sens: new FormControl<Sens>(Sens.ALLER, {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
     jour: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     conducteur: new FormControl("", { nonNullable: true }),
     vehicule: new FormControl("", { nonNullable: true }),
     heureDepart: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     heureArriveeGare: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     heureRetourLieu: new FormControl("", { nonNullable: true }),
-    capacite: new FormControl(4, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    capacite: new FormControl(4, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(1)],
+    }),
     commentaire: new FormControl("", { nonNullable: true }),
     driverPaxId: new FormControl("", { nonNullable: true }),
   });
@@ -161,7 +167,9 @@ export class NavettesTabComponent implements OnChanges {
       // Si le détail de cette navette était ouvert, on le rafraîchit pour
       // refléter les changements (ex: passager·es toujours à jour).
       if (this.navetteOuverte()?.id === idEnEdition) {
-        this.api.recupererNavette(idEnEdition!).subscribe((navette) => this.navetteOuverte.set(navette));
+        this.api
+          .recupererNavette(idEnEdition!)
+          .subscribe((navette) => this.navetteOuverte.set(navette));
       }
     });
   }

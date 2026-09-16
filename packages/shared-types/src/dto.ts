@@ -91,7 +91,6 @@ export interface RechercherPaxQuery {
   nom: string;
 }
 
-
 // ---- Créneaux de disponibilité conducteur·ice ----
 
 export interface CreateDriverAvailabilitySlotInput {

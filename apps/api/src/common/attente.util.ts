@@ -36,7 +36,8 @@ export function calculerNiveauAttente(
   const minutesNavette = parseHeureEnMinutes(heureNavetteEnGare);
   if (minutesTrajet === null || minutesNavette === null) return null;
 
-  const ecart = sens === Sens.ALLER ? minutesNavette - minutesTrajet : minutesTrajet - minutesNavette;
+  const ecart =
+    sens === Sens.ALLER ? minutesNavette - minutesTrajet : minutesTrajet - minutesNavette;
   const attenteMinutes = Math.max(ecart, 0);
 
   if (attenteMinutes >= SEUIL_ELEVE_MIN) return NiveauAttente.ELEVE;

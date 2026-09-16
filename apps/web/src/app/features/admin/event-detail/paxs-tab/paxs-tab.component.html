@@ -5,7 +5,9 @@
       <input matInput formControlName="nom" />
     </mat-form-field>
     <button mat-stroked-button type="submit">Rechercher</button>
-    <button mat-button type="button" (click)="rechercheForm.reset(); charger()">Réinitialiser</button>
+    <button mat-button type="button" (click)="rechercheForm.reset(); charger()">
+      Réinitialiser
+    </button>
   </form>
 </div>
 
@@ -29,7 +31,9 @@
       @if (paxOuvert() === pax.id) {
         <div class="lien-detail">
           <code>{{ lienDe(pax) }}</code>
-          <button mat-icon-button (click)="copierLien(pax)"><mat-icon>content_copy</mat-icon></button>
+          <button mat-icon-button (click)="copierLien(pax)">
+            <mat-icon>content_copy</mat-icon>
+          </button>
         </div>
       }
     </td>

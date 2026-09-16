@@ -31,7 +31,10 @@ interface TrajetFormGroup {
 
 function creerTrajetForm(): FormGroup<TrajetFormGroup> {
   return new FormGroup<TrajetFormGroup>({
-    mode: new FormControl(ModeTransport.TRAIN, { nonNullable: true, validators: [Validators.required] }),
+    mode: new FormControl(ModeTransport.TRAIN, {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
     jour: new FormControl("", { nonNullable: true }),
     heure: new FormControl("", { nonNullable: true }),
     gare: new FormControl("", { nonNullable: true }),
@@ -77,7 +80,15 @@ export class MonEspaceComponent {
   readonly enregistrementTrajet = signal<Sens | null>(null);
 
   readonly navettes = signal<NavetteAvecNomsPassagers[]>([]);
-  readonly colonnesNavettes = ["libelle", "sens", "jour", "heures", "conducteur", "places", "passagers"];
+  readonly colonnesNavettes = [
+    "libelle",
+    "sens",
+    "jour",
+    "heures",
+    "conducteur",
+    "places",
+    "passagers",
+  ];
 
   readonly paxsEvenement = signal<PaxOverview[]>([]);
   readonly colonnesPaxs = ["nom", "discord", "vehicule", "commentaire"];
@@ -145,7 +156,9 @@ export class MonEspaceComponent {
       },
       error: () => {
         this.chargement.set(false);
-        this.erreur.set("Ce lien personnel n'est plus valide. Contacte l'organisation pour le retrouver.");
+        this.erreur.set(
+          "Ce lien personnel n'est plus valide. Contacte l'organisation pour le retrouver.",
+        );
       },
     });
 
@@ -296,7 +309,8 @@ export class MonEspaceComponent {
         this.snackBar.open("Créneau supprimé.", undefined, { duration: 2000 });
         this.chargerMesDisponibilites();
       },
-      error: () => this.snackBar.open("Échec de la suppression, réessaie.", undefined, { duration: 3000 }),
+      error: () =>
+        this.snackBar.open("Échec de la suppression, réessaie.", undefined, { duration: 3000 }),
     });
   }
 

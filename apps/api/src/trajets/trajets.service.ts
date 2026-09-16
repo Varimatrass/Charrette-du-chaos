@@ -46,7 +46,8 @@ export class TrajetsService {
       });
     }
 
-    const statutApresModif = existant.statut === StatutTrajet.ASSIGNE ? StatutTrajet.A_REVERIFIER : existant.statut;
+    const statutApresModif =
+      existant.statut === StatutTrajet.ASSIGNE ? StatutTrajet.A_REVERIFIER : existant.statut;
 
     return this.prisma.trajet.update({
       where: { id: existant.id },
@@ -63,14 +64,16 @@ export class TrajetsService {
 
     return trajets.map(({ navette, ...trajet }) => ({
       ...trajet,
-      niveauAttente: navette ? calculerNiveauAttente(
-          // Le client Prisma génère son propre enum `Sens` (structurellement identique
-          // à celui de shared-types mais nominalement distinct pour TypeScript) : cast
-          // sûr car les valeurs viennent du même schéma Prisma qui définit "ALLER"/"RETOUR".
-          trajet.sens as unknown as Sens,
-          trajet.heure,
-          navette.heureArriveeGare,
-        ) : null,
+      niveauAttente: navette
+        ? calculerNiveauAttente(
+            // Le client Prisma génère son propre enum `Sens` (structurellement identique
+            // à celui de shared-types mais nominalement distinct pour TypeScript) : cast
+            // sûr car les valeurs viennent du même schéma Prisma qui définit "ALLER"/"RETOUR".
+            trajet.sens as unknown as Sens,
+            trajet.heure,
+            navette.heureArriveeGare,
+          )
+        : null,
     }));
   }
 

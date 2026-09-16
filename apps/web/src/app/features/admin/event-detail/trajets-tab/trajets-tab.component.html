@@ -42,7 +42,9 @@
   <ng-container matColumnDef="statut">
     <th mat-header-cell *matHeaderCellDef>Statut</th>
     <td mat-cell *matCellDef="let t">
-      <mat-chip [class.a-reverifier]="t.statut === StatutTrajet.A_REVERIFIER">{{ t.statut }}</mat-chip>
+      <mat-chip [class.a-reverifier]="t.statut === StatutTrajet.A_REVERIFIER">{{
+        t.statut
+      }}</mat-chip>
       @if (t.statut === StatutTrajet.A_REVERIFIER) {
         <button mat-button (click)="marquerVerifie(t)">Marquer vérifié</button>
       }
