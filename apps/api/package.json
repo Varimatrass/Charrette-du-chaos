@@ -17,15 +17,15 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "lint:check": "eslint \"{src,test}/**/*.ts\""
   },
   "dependencies": {
     "@desordre/shared-types": "workspace:*",
     "@nestjs/common": "^11.0.1",
-    "@nestjs/config": "^12.0.0",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
-    "@nestjs/mapped-types": "^12.0.0",
+    "@nestjs/mapped-types": "^2.1.1",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "7.10.0",
@@ -79,9 +79,6 @@
         }
       ]
     },
-    "transformIgnorePatterns": [
-      "/node_modules/(?!\\.pnpm/@nestjs\\+(config|mapped-types)@)(?!@nestjs/(config|mapped-types)/)"
-    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s",
       "!**/*.spec.ts",
