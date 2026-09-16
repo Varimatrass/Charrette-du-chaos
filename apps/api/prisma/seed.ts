@@ -13,322 +13,326 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import type { Direction, TransportMode, TripStatus } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
-const NOM_EVENEMENT_SEED = "[SEED] Été 2026 — Charrette de test";
+const SEED_EVENT_NAME = "[SEED] Été 2026 — Charrette de test";
 
-const JOUR_ALLER = "2026-09-18"; // vendredi
-const JOUR_RETOUR = "2026-09-20"; // dimanche
+const OUTBOUND_DAY = "2026-09-18"; // vendredi
+const RETURN_DAY = "2026-09-20"; // dimanche
+const STATION = "Gare de Testville";
+
+interface TripSeed {
+  direction: Direction;
+  mode: TransportMode;
+  day?: string;
+  time?: string;
+  station?: string;
+  /** Clé dans `shuttles` (voir plus bas), résolue en id après création. */
+  shuttle?: ShuttleKey;
+  status?: TripStatus;
+  comment?: string;
+}
+
+interface PaxSeed {
+  name: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  comment?: string;
+  trips: TripSeed[];
+}
+
+type ShuttleKey = "outboundMorning" | "outboundAfternoon" | "returnMorning" | "returnEvening";
+
+// Deux créneaux à l'aller (le vendredi, gare -> lieu) et deux au retour
+// (le dimanche, lieu -> gare), avec des horaires qui donnent volontairement
+// des temps d'attente variés une fois les paxs assignés (OK / MEDIUM / HIGH).
+const SHUTTLES: Record<
+  ShuttleKey,
+  {
+    label: string;
+    day: string;
+    direction: Direction;
+    driverName: string;
+    vehicle: string;
+    departureTime: string;
+    stationArrivalTime: string;
+    venueReturnTime: string | null;
+    comment?: string;
+  }
+> = {
+  outboundMorning: {
+    label: "Navette gare — matin",
+    day: OUTBOUND_DAY,
+    direction: "OUTBOUND",
+    driverName: "Sam",
+    vehicle: "Kangoo blanc",
+    departureTime: "08:00",
+    stationArrivalTime: "08:25",
+    venueReturnTime: "08:50",
+    comment: "Passe devant la boulangerie si besoin de croissants.",
+  },
+  outboundAfternoon: {
+    label: "Navette gare — après-midi",
+    day: OUTBOUND_DAY,
+    direction: "OUTBOUND",
+    driverName: "Jo",
+    vehicle: "Berlingo",
+    departureTime: "14:00",
+    stationArrivalTime: "14:25",
+    venueReturnTime: "14:50",
+  },
+  returnMorning: {
+    label: "Navette retour — matin",
+    day: RETURN_DAY,
+    direction: "RETURN",
+    driverName: "Sam",
+    vehicle: "Kangoo blanc",
+    departureTime: "09:00",
+    stationArrivalTime: "09:25",
+    venueReturnTime: null,
+  },
+  returnEvening: {
+    label: "Navette retour — soir",
+    day: RETURN_DAY,
+    direction: "RETURN",
+    driverName: "Alex",
+    vehicle: "Berlingo",
+    departureTime: "17:00",
+    stationArrivalTime: "17:25",
+    venueReturnTime: null,
+    comment: "Dernière navette de la journée, prévenir si retard train.",
+  },
+};
+
+// 10 paxs, chacun·e dans une situation différente pour couvrir les cas
+// affichés dans le back-office et dans "mon espace".
+const PAXS: PaxSeed[] = [
+  {
+    name: "Alix Moreau",
+    contactEmail: "alix.test@example.com",
+    trips: [
+      {
+        direction: "OUTBOUND",
+        mode: "TRAIN",
+        day: OUTBOUND_DAY,
+        time: "08:05",
+        station: STATION,
+        shuttle: "outboundMorning",
+        status: "ASSIGNED",
+      },
+      {
+        direction: "RETURN",
+        mode: "TRAIN",
+        day: RETURN_DAY,
+        time: "09:35",
+        station: STATION,
+        shuttle: "returnMorning",
+        status: "ASSIGNED",
+      },
+    ],
+  },
+  {
+    name: "Bilal Nasser",
+    contactPhone: "0600000002",
+    trips: [
+      // Assigné mais avec un vrai écart -> teste l'indicateur "MEDIUM".
+      {
+        direction: "OUTBOUND",
+        mode: "TRAIN",
+        day: OUTBOUND_DAY,
+        time: "07:50",
+        station: STATION,
+        shuttle: "outboundMorning",
+        status: "ASSIGNED",
+      },
+      { direction: "RETURN", mode: "CARPOOL", day: RETURN_DAY, comment: "Repart avec Fanta." },
+    ],
+  },
+  {
+    name: "Camille Dubreuil",
+    contactEmail: "camille.test@example.com",
+    trips: [
+      // Pas encore assigné·e -> reste en "PENDING", visible dans la liste des demandes.
+      { direction: "OUTBOUND", mode: "TRAIN", day: OUTBOUND_DAY, time: "09:10", station: STATION },
+    ],
+  },
+  {
+    name: "Dee Traoré",
+    trips: [
+      // Gros écart à l'aller -> teste l'indicateur "HIGH".
+      {
+        direction: "OUTBOUND",
+        mode: "TRAIN",
+        day: OUTBOUND_DAY,
+        time: "12:30",
+        station: STATION,
+        shuttle: "outboundAfternoon",
+        status: "ASSIGNED",
+      },
+      {
+        direction: "RETURN",
+        mode: "TRAIN",
+        day: RETURN_DAY,
+        time: "17:40",
+        station: STATION,
+        shuttle: "returnEvening",
+        status: "ASSIGNED",
+      },
+    ],
+  },
+  {
+    name: "Emeka Okafor",
+    contactEmail: "emeka.test@example.com",
+    trips: [
+      { direction: "OUTBOUND", mode: "OTHER", day: OUTBOUND_DAY, comment: "Vient en vélo." },
+      {
+        direction: "RETURN",
+        mode: "TRAIN",
+        day: RETURN_DAY,
+        time: "09:15",
+        station: STATION,
+        shuttle: "returnMorning",
+        status: "ASSIGNED",
+      },
+    ],
+  },
+  {
+    name: "Fanta Camara",
+    contactPhone: "0600000006",
+    trips: [
+      { direction: "OUTBOUND", mode: "CARPOOL" },
+      { direction: "RETURN", mode: "CARPOOL", comment: "Ramène Bilal." },
+    ],
+  },
+  {
+    name: "Gwen Le Roux",
+    trips: [
+      {
+        direction: "OUTBOUND",
+        mode: "TRAIN",
+        day: OUTBOUND_DAY,
+        time: "08:10",
+        station: STATION,
+        shuttle: "outboundMorning",
+        status: "ASSIGNED",
+      },
+      // Retour pas encore renseigné précisément -> PENDING.
+      { direction: "RETURN", mode: "TRAIN", day: RETURN_DAY },
+    ],
+  },
+  {
+    name: "Hana Petit",
+    contactEmail: "hana.test@example.com",
+    trips: [
+      // Assigné·e puis horaire changé après coup -> "à revérifier" côté organisation.
+      {
+        direction: "OUTBOUND",
+        mode: "TRAIN",
+        day: OUTBOUND_DAY,
+        time: "13:50",
+        station: STATION,
+        shuttle: "outboundAfternoon",
+        status: "TO_RECHECK",
+        comment: "A changé son heure de train après l'assignation.",
+      },
+    ],
+  },
+  {
+    name: "Ismaël Haddad",
+    trips: [
+      // Arrivé·e par ses propres moyens avant l'évènement : seulement un retour.
+      {
+        direction: "RETURN",
+        mode: "TRAIN",
+        day: RETURN_DAY,
+        time: "17:15",
+        station: STATION,
+        shuttle: "returnEvening",
+        status: "ASSIGNED",
+      },
+    ],
+  },
+  {
+    name: "Jules Fontaine",
+    contactEmail: "jules.test@example.com",
+    comment: "Vient de s'inscrire, n'a pas encore ses horaires.",
+    trips: [],
+  },
+];
 
 async function main(): Promise<void> {
   // On repart d'une base propre pour l'évènement de seed uniquement.
-  await prisma.event.deleteMany({ where: { nom: NOM_EVENEMENT_SEED } });
+  await prisma.event.deleteMany({ where: { name: SEED_EVENT_NAME } });
 
   const event = await prisma.event.create({
     data: {
-      nom: NOM_EVENEMENT_SEED,
-      dateDebut: new Date(JOUR_ALLER),
-      dateFin: new Date(JOUR_RETOUR),
-      lieu: "Ferme du Chaos (lieu de test)",
-      gareReference: "Gare de Testville",
+      name: SEED_EVENT_NAME,
+      startDate: new Date(OUTBOUND_DAY),
+      endDate: new Date(RETURN_DAY),
+      location: "Ferme du Chaos (lieu de test)",
+      referenceStation: STATION,
     },
   });
 
-  // ---- Navettes ----
-  // Deux créneaux à l'aller (le vendredi, gare -> lieu) et deux au retour
-  // (le dimanche, lieu -> gare), avec des horaires qui donnent volontairement
-  // des temps d'attente variés une fois les paxs assignés (OK / MOYEN / ELEVE).
-  const [navetteAllerMatin, navetteAllerApresMidi, navetteRetourMatin, navetteRetourSoir] =
-    await Promise.all([
-      prisma.navette.create({
-        data: {
-          eventId: event.id,
-          libelle: "Navette gare — matin",
-          jour: new Date(JOUR_ALLER),
-          sens: "ALLER",
-          conducteur: "Sam",
-          vehicule: "Kangoo blanc",
-          heureDepart: "08:00",
-          heureArriveeGare: "08:25",
-          heureRetourLieu: "08:50",
-          capacite: 4,
-          commentaire: "Passe devant la boulangerie si besoin de croissants.",
-        },
-      }),
-      prisma.navette.create({
-        data: {
-          eventId: event.id,
-          libelle: "Navette gare — après-midi",
-          jour: new Date(JOUR_ALLER),
-          sens: "ALLER",
-          conducteur: "Jo",
-          vehicule: "Berlingo",
-          heureDepart: "14:00",
-          heureArriveeGare: "14:25",
-          heureRetourLieu: "14:50",
-          capacite: 4,
-        },
-      }),
-      prisma.navette.create({
-        data: {
-          eventId: event.id,
-          libelle: "Navette retour — matin",
-          jour: new Date(JOUR_RETOUR),
-          sens: "RETOUR",
-          conducteur: "Sam",
-          vehicule: "Kangoo blanc",
-          heureDepart: "09:00",
-          heureArriveeGare: "09:25",
-          heureRetourLieu: null,
-          capacite: 4,
-        },
-      }),
-      prisma.navette.create({
-        data: {
-          eventId: event.id,
-          libelle: "Navette retour — soir",
-          jour: new Date(JOUR_RETOUR),
-          sens: "RETOUR",
-          conducteur: "Alex",
-          vehicule: "Berlingo",
-          heureDepart: "17:00",
-          heureArriveeGare: "17:25",
-          heureRetourLieu: null,
-          capacite: 4,
-          commentaire: "Dernière navette de la journée, prévenir si retard train.",
-        },
-      }),
-    ]);
+  const shuttleIds = {} as Record<ShuttleKey, string>;
+  for (const [key, shuttle] of Object.entries(SHUTTLES) as [
+    ShuttleKey,
+    (typeof SHUTTLES)[ShuttleKey],
+  ][]) {
+    const created = await prisma.shuttle.create({
+      data: {
+        eventId: event.id,
+        ...shuttle,
+        day: new Date(shuttle.day),
+        capacity: 4,
+      },
+    });
+    shuttleIds[key] = created.id;
+  }
 
-  // ---- Paxs + trajets ----
-  // 10 paxs, chacun·e dans une situation différente pour couvrir les cas
-  // affichés dans le back-office et dans "mon espace".
-  type TrajetSeed = {
-    sens: "ALLER" | "RETOUR";
-    mode: "TRAIN" | "COVOITURAGE" | "AUTRE";
-    jour?: string;
-    heure?: string;
-    gare?: string;
-    navetteId?: string;
-    statut?: "EN_ATTENTE" | "ASSIGNE" | "A_REVERIFIER";
-    commentaire?: string;
-  };
-
-  type PaxSeed = {
-    nom: string;
-    contactEmail?: string;
-    contactTelephone?: string;
-    commentaire?: string;
-    trajets: TrajetSeed[];
-  };
-
-  const paxs: PaxSeed[] = [
-    {
-      nom: "Alix Moreau",
-      contactEmail: "alix.test@example.com",
-      trajets: [
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "08:05",
-          gare: "Gare de Testville",
-          navetteId: navetteAllerMatin.id,
-          statut: "ASSIGNE",
-        },
-        {
-          sens: "RETOUR",
-          mode: "TRAIN",
-          jour: JOUR_RETOUR,
-          heure: "09:35",
-          gare: "Gare de Testville",
-          navetteId: navetteRetourMatin.id,
-          statut: "ASSIGNE",
-        },
-      ],
-    },
-    {
-      nom: "Bilal Nasser",
-      contactTelephone: "0600000002",
-      trajets: [
-        // Assigné mais avec un vrai écart -> teste l'indicateur "MOYEN".
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "07:50",
-          gare: "Gare de Testville",
-          navetteId: navetteAllerMatin.id,
-          statut: "ASSIGNE",
-        },
-        {
-          sens: "RETOUR",
-          mode: "COVOITURAGE",
-          jour: JOUR_RETOUR,
-          commentaire: "Repart avec Fanta.",
-        },
-      ],
-    },
-    {
-      nom: "Camille Dubreuil",
-      contactEmail: "camille.test@example.com",
-      trajets: [
-        // Pas encore assigné·e -> reste en "EN_ATTENTE", visible dans la liste des demandes.
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "09:10",
-          gare: "Gare de Testville",
-        },
-      ],
-    },
-    {
-      nom: "Dee Traoré",
-      trajets: [
-        // Gros écart à l'aller -> teste l'indicateur "ELEVE".
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "12:30",
-          gare: "Gare de Testville",
-          navetteId: navetteAllerApresMidi.id,
-          statut: "ASSIGNE",
-        },
-        {
-          sens: "RETOUR",
-          mode: "TRAIN",
-          jour: JOUR_RETOUR,
-          heure: "17:40",
-          gare: "Gare de Testville",
-          navetteId: navetteRetourSoir.id,
-          statut: "ASSIGNE",
-        },
-      ],
-    },
-    {
-      nom: "Emeka Okafor",
-      contactEmail: "emeka.test@example.com",
-      trajets: [
-        { sens: "ALLER", mode: "AUTRE", jour: JOUR_ALLER, commentaire: "Vient en vélo." },
-        {
-          sens: "RETOUR",
-          mode: "TRAIN",
-          jour: JOUR_RETOUR,
-          heure: "09:15",
-          gare: "Gare de Testville",
-          navetteId: navetteRetourMatin.id,
-          statut: "ASSIGNE",
-        },
-      ],
-    },
-    {
-      nom: "Fanta Camara",
-      contactTelephone: "0600000006",
-      trajets: [
-        { sens: "ALLER", mode: "COVOITURAGE" },
-        { sens: "RETOUR", mode: "COVOITURAGE", commentaire: "Ramène Bilal." },
-      ],
-    },
-    {
-      nom: "Gwen Le Roux",
-      trajets: [
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "08:10",
-          gare: "Gare de Testville",
-          navetteId: navetteAllerMatin.id,
-          statut: "ASSIGNE",
-        },
-        // Retour pas encore renseigné précisément -> EN_ATTENTE.
-        { sens: "RETOUR", mode: "TRAIN", jour: JOUR_RETOUR },
-      ],
-    },
-    {
-      nom: "Hana Petit",
-      contactEmail: "hana.test@example.com",
-      trajets: [
-        // Assigné·e puis horaire changé après coup -> "à revérifier" côté organisation.
-        {
-          sens: "ALLER",
-          mode: "TRAIN",
-          jour: JOUR_ALLER,
-          heure: "13:50",
-          gare: "Gare de Testville",
-          navetteId: navetteAllerApresMidi.id,
-          statut: "A_REVERIFIER",
-          commentaire: "A changé son heure de train après l'assignation.",
-        },
-      ],
-    },
-    {
-      nom: "Ismaël Haddad",
-      trajets: [
-        // Arrivé·e par ses propres moyens avant l'évènement : seulement un retour.
-        {
-          sens: "RETOUR",
-          mode: "TRAIN",
-          jour: JOUR_RETOUR,
-          heure: "17:15",
-          gare: "Gare de Testville",
-          navetteId: navetteRetourSoir.id,
-          statut: "ASSIGNE",
-        },
-      ],
-    },
-    {
-      nom: "Jules Fontaine",
-      contactEmail: "jules.test@example.com",
-      commentaire: "Vient de s'inscrire, n'a pas encore ses horaires.",
-      trajets: [],
-    },
-  ];
-
-  for (const p of paxs) {
+  for (const paxSeed of PAXS) {
     const pax = await prisma.pax.create({
       data: {
         eventId: event.id,
-        nom: p.nom,
-        contactEmail: p.contactEmail,
-        contactTelephone: p.contactTelephone,
-        commentaire: p.commentaire,
+        name: paxSeed.name,
+        contactEmail: paxSeed.contactEmail,
+        contactPhone: paxSeed.contactPhone,
+        comment: paxSeed.comment,
       },
     });
 
-    for (const t of p.trajets) {
-      await prisma.trajet.create({
+    for (const trip of paxSeed.trips) {
+      await prisma.trip.create({
         data: {
           eventId: event.id,
           paxId: pax.id,
-          sens: t.sens,
-          mode: t.mode,
-          jour: t.jour ? new Date(t.jour) : null,
-          heure: t.heure ?? null,
-          gare: t.gare ?? null,
-          navetteId: t.navetteId ?? null,
-          statut: t.statut ?? "EN_ATTENTE",
-          commentaire: t.commentaire ?? null,
+          direction: trip.direction,
+          mode: trip.mode,
+          day: trip.day ? new Date(trip.day) : null,
+          time: trip.time ?? null,
+          station: trip.station ?? null,
+          shuttleId: trip.shuttle ? shuttleIds[trip.shuttle] : null,
+          status: trip.status ?? "PENDING",
+          comment: trip.comment ?? null,
         },
       });
     }
   }
 
-  console.log(`Seed OK : évènement "${event.nom}" (${event.id})`);
-  console.log(`  - ${paxs.length} paxs`);
-  console.log("  - 4 navettes (2 aller, 2 retour)");
+  console.log(`Seed OK : évènement "${event.name}" (${event.id})`);
+  console.log(`  - ${PAXS.length} paxs`);
+  console.log(`  - ${Object.keys(SHUTTLES).length} navettes (2 aller, 2 retour)`);
   console.log(`  - lien public : /e/${event.id}`);
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
   .finally(async () => {
