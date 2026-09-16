@@ -1,41 +1,8 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
-import { VehicleLendingMode } from "@desordre/shared-types";
+import { OmitType, PartialType } from "@nestjs/mapped-types";
 import type { UpdatePaxInput } from "@desordre/shared-types";
+import { CreatePaxDto } from "./create-pax.dto";
 
-export class UpdatePaxDto implements UpdatePaxInput {
-  @IsOptional()
-  @IsString()
-  nom?: string;
-
-  @IsOptional()
-  @IsEmail()
-  contactEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  contactTelephone?: string;
-
-  @IsOptional()
-  @IsString()
-  discordHandle?: string;
-
-  @IsOptional()
-  @IsString()
-  commentaire?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasVehicle?: boolean;
-
-  @IsOptional()
-  @IsEnum(VehicleLendingMode)
-  vehicleLendingMode?: VehicleLendingMode;
-
-  @IsOptional()
-  @IsBoolean()
-  hasDrivingLicense?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  willingToDriveShuttle?: boolean;
-}
+/** Tout est facultatif ; l'évènement d'un pax ne change jamais après coup. */
+export class UpdatePaxDto
+  extends PartialType(OmitType(CreatePaxDto, ["eventId"] as const))
+  implements UpdatePaxInput {}

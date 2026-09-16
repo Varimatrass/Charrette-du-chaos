@@ -1,13 +1,13 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { AppController } from "./app.controller";
-import { AppService } from "./app.service";
-import { PrismaModule } from "./prisma/prisma.module";
-import { EventsModule } from "./events/events.module";
-import { PaxModule } from "./pax/pax.module";
-import { TrajetsModule } from "./trajets/trajets.module";
-import { NavettesModule } from "./navettes/navettes.module";
+import { AdminAuthController } from "./auth/admin-auth.controller";
 import { DriverAvailabilityModule } from "./driver-availability/driver-availability.module";
+import { EventsModule } from "./events/events.module";
+import { HealthController } from "./health/health.controller";
+import { PaxModule } from "./pax/pax.module";
+import { PrismaModule } from "./prisma/prisma.module";
+import { ShuttlesModule } from "./shuttles/shuttles.module";
+import { TripsModule } from "./trips/trips.module";
 
 @Module({
   imports: [
@@ -15,11 +15,10 @@ import { DriverAvailabilityModule } from "./driver-availability/driver-availabil
     PrismaModule,
     EventsModule,
     PaxModule,
-    TrajetsModule,
-    NavettesModule,
+    TripsModule,
+    ShuttlesModule,
     DriverAvailabilityModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [HealthController, AdminAuthController],
 })
 export class AppModule {}

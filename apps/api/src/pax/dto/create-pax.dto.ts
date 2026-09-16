@@ -1,7 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
-  IsEnum,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -16,7 +16,7 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsString()
   @IsNotEmpty()
-  nom!: string;
+  name!: string;
 
   @IsOptional()
   @IsEmail()
@@ -24,7 +24,7 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsOptional()
   @IsString()
-  contactTelephone?: string;
+  contactPhone?: string;
 
   @IsOptional()
   @IsString()
@@ -32,14 +32,14 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsOptional()
   @IsString()
-  commentaire?: string;
+  comment?: string;
 
   @IsOptional()
   @IsBoolean()
   hasVehicle?: boolean;
 
   @IsOptional()
-  @IsEnum(VehicleLendingMode)
+  @IsIn(Object.values(VehicleLendingMode))
   vehicleLendingMode?: VehicleLendingMode;
 
   @IsOptional()

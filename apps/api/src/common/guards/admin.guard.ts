@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Request } from "express";
+import { ADMIN_KEY_HEADER, ENV } from "../constants";
 
 /**
  * Garde d'accès au back-office organisateur·ice pour la V1.
@@ -17,8 +18,8 @@ export class AdminGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const provided = request.header("x-admin-key");
-    const expected = this.config.get<string>("ADMIN_KEY");
+    const provided = request.header(ADMIN_KEY_HEADER);
+    const expected = this.config.get<string>(ENV.ADMIN_KEY);
 
     if (!expected) {
       // Mal configuré côté serveur : on refuse plutôt que de laisser passer.

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from "@nestjs/common";
 import { AdminGuard } from "../common/guards/admin.guard";
 import { CreateEventDto } from "./dto/create-event.dto";
 import { UpdateEventDto } from "./dto/update-event.dto";
@@ -19,14 +28,13 @@ export class EventsController {
   }
 
   @Get("events/:id")
-  findOne(@Param("id") id: string) {
+  findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.eventsService.findOne(id);
   }
 
   // Écriture réservée aux organisateur·ices : sous /admin/... comme les autres
-  // routes protégées par AdminGuard (pax, navettes, trajets), pour que
-  // l'intercepteur front qui attache x-admin-key (basé sur "/admin/" dans
-  // l'URL) s'applique automatiquement.
+  // routes protégées par AdminGuard, pour que l'intercepteur front qui attache
+  // x-admin-key (basé sur "/admin/" dans l'URL) s'applique automatiquement.
   @UseGuards(AdminGuard)
   @Post("admin/events")
   create(@Body() dto: CreateEventDto) {
@@ -35,7 +43,7 @@ export class EventsController {
 
   @UseGuards(AdminGuard)
   @Patch("admin/events/:id")
-  update(@Param("id") id: string, @Body() dto: UpdateEventDto) {
+  update(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateEventDto) {
     return this.eventsService.update(id, dto);
   }
 }

@@ -1,6 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { ENV } from "../common/constants";
+
+const CONNECT_MAX_ATTEMPTS = 5;
+const CONNECT_RETRY_DELAY_MS = 2000;
 
 /**
  * Wrapper NestJS autour de PrismaClient : ouvre la connexion au démarrage
@@ -17,7 +21,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor() {
     super({
-      adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+      adapter: new PrismaPg({ connectionString: process.env[ENV.DATABASE_URL] }),
     });
   }
 
@@ -25,14 +29,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.connectWithRetries();
   }
 
+  async onModuleDestroy(): Promise<void> {
+    await this.$disconnect();
+  }
+
   /**
    * Avec les driver adapters (obligatoires depuis Prisma 7), `$connect()`
    * ne garantit pas qu'une vraie connexion réseau a été établie : selon
    * l'adapter, elle peut être ouverte paresseusement, à la première requête.
    * Si la base est injoignable (pod arrêté, mauvais port...), l'appli
-   * démarrait donc "normalement" et affichait même "Connecté à la base de
-   * données", pour planter bien plus tard sur la première requête réelle —
-   * en 500 générique, sans que ce soit visible au démarrage.
+   * démarrait donc "normalement" pour planter bien plus tard sur la première
+   * requête réelle — en 500 générique, sans que ce soit visible au démarrage.
    *
    * On vérifie donc explicitement la connexion avec une requête triviale,
    * avec quelques tentatives espacées pour encaisser un cas fréquent en dev
@@ -40,7 +47,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    * abandonne franchement si la base reste injoignable : mieux vaut un crash
    * clair au démarrage qu'un serveur qui tourne mais ne peut rien faire.
    */
-  private async connectWithRetries(maxAttempts = 5, retryDelayMs = 2000): Promise<void> {
+  private async connectWithRetries(
+    maxAttempts = CONNECT_MAX_ATTEMPTS,
+    retryDelayMs = CONNECT_RETRY_DELAY_MS,
+  ): Promise<void> {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.$connect();
@@ -48,12 +58,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         this.logger.log("Connecté à la base de données");
         return;
       } catch (error) {
-        const isLastAttempt = attempt === maxAttempts;
-        if (isLastAttempt) {
+        if (attempt === maxAttempts) {
           this.logger.error(
             `Impossible de se connecter à la base de données après ${maxAttempts} tentatives. ` +
-              "Vérifie que le conteneur Postgres est bien lancé (`podman compose up -d db` ou " +
-              "`docker compose up -d db`) et que DATABASE_URL pointe vers le bon host/port.",
+              "Vérifie que le conteneur Postgres est bien lancé (`docker compose up -d db`) " +
+              "et que DATABASE_URL pointe vers le bon host/port.",
           );
           throw error;
         }
@@ -64,9 +73,5 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
       }
     }
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.$disconnect();
   }
 }

@@ -1,11 +1,32 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Pax } from "@prisma/client";
-import type { VehicleLendingMode as PrismaVehicleLendingMode } from "@prisma/client";
-import type { PaxSubmissionResult } from "@desordre/shared-types";
+import type { PaxOverview, PaxSubmissionResult } from "@desordre/shared-types";
+import { DEFAULT_FRONTEND_URL, ENV } from "../common/constants";
+import { omitKeys, omitUndefined } from "../common/utils/objects";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreatePaxDto } from "./dto/create-pax.dto";
 import { UpdatePaxDto } from "./dto/update-pax.dto";
+
+/** Vue d'un pax sans son jeton d'accès (tout ce qui n'est pas back-office). */
+export type PublicPax = Omit<Pax, "accessToken">;
+
+/** Champs exposés aux autres paxs de l'évènement : jamais de coordonnées ni de jeton. */
+const PAX_OVERVIEW_SELECT = {
+  id: true,
+  name: true,
+  discordHandle: true,
+  comment: true,
+  hasVehicle: true,
+  vehicleLendingMode: true,
+  hasDrivingLicense: true,
+  willingToDriveShuttle: true,
+} as const;
+
+/** Retire le jeton d'accès d'un pax avant de le renvoyer. */
+export function toPublicPax<T extends Pax>(pax: T): Omit<T, "accessToken"> {
+  return omitKeys(pax, ["accessToken"]);
+}
 
 @Injectable()
 export class PaxService {
@@ -15,83 +36,42 @@ export class PaxService {
   ) {}
 
   async create(dto: CreatePaxDto): Promise<PaxSubmissionResult> {
-    const pax = await this.prisma.pax.create({
-      data: {
-        eventId: dto.eventId,
-        nom: dto.nom,
-        contactEmail: dto.contactEmail,
-        contactTelephone: dto.contactTelephone,
-        discordHandle: dto.discordHandle,
-        commentaire: dto.commentaire,
-        hasVehicle: dto.hasVehicle,
-        // Cast sûr : même nuance nominale Prisma/shared-types que pour les
-        // autres enums (voir trajets.service.ts) — mêmes valeurs, deux types
-        // TS distincts.
-        vehicleLendingMode: dto.vehicleLendingMode as unknown as PrismaVehicleLendingMode,
-        hasDrivingLicense: dto.hasDrivingLicense,
-        willingToDriveShuttle: dto.willingToDriveShuttle,
-      },
-    });
-
+    const pax = await this.prisma.pax.create({ data: dto });
     return this.toSubmissionResult(pax);
   }
 
-  async update(pax: Pax, dto: UpdatePaxDto) {
+  async update(pax: Pax, dto: UpdatePaxDto): Promise<PublicPax> {
     const updated = await this.prisma.pax.update({
       where: { id: pax.id },
-      data: {
-        ...(dto.nom !== undefined && { nom: dto.nom }),
-        ...(dto.contactEmail !== undefined && { contactEmail: dto.contactEmail }),
-        ...(dto.contactTelephone !== undefined && { contactTelephone: dto.contactTelephone }),
-        ...(dto.discordHandle !== undefined && { discordHandle: dto.discordHandle }),
-        ...(dto.commentaire !== undefined && { commentaire: dto.commentaire }),
-        ...(dto.hasVehicle !== undefined && { hasVehicle: dto.hasVehicle }),
-        ...(dto.vehicleLendingMode !== undefined && {
-          vehicleLendingMode: dto.vehicleLendingMode as unknown as PrismaVehicleLendingMode,
-        }),
-        ...(dto.hasDrivingLicense !== undefined && { hasDrivingLicense: dto.hasDrivingLicense }),
-        ...(dto.willingToDriveShuttle !== undefined && {
-          willingToDriveShuttle: dto.willingToDriveShuttle,
-        }),
-      },
+      data: omitUndefined(dto),
     });
-    return this.toPublic(updated);
+    return toPublicPax(updated);
   }
 
+  /** "Mon espace" : le pax avec ses trajets et, pour chacun, la navette éventuellement assignée. */
   async findMine(pax: Pax) {
-    const withTrajets = await this.prisma.pax.findUnique({
+    const withTrips = await this.prisma.pax.findUnique({
       where: { id: pax.id },
-      include: { trajets: { include: { navette: true } } },
+      include: { trips: { include: { shuttle: true } } },
     });
-    if (!withTrajets) throw new NotFoundException("Pax introuvable");
-    const { accessToken: _accessToken, ...rest } = withTrajets;
-    return rest;
+    if (!withTrips) throw new NotFoundException("Pax introuvable");
+    return toPublicPax(withTrips);
   }
 
-  /** Vue sans le jeton d'accès, pour toute réponse qui n'a pas besoin de l'exposer à nouveau. */
-  private toPublic(pax: Pax) {
-    const { accessToken: _accessToken, ...rest } = pax;
-    return rest;
+  /** Back-office : inclut le jeton, pour renvoyer un lien perdu. */
+  findAllForEvent(eventId: string): Promise<Pax[]> {
+    return this.prisma.pax.findMany({ where: { eventId }, orderBy: { name: "asc" } });
   }
 
-  findAllForEvent(eventId: string) {
+  /** Back-office : recherche insensible à la casse sur une partie du nom. */
+  search(eventId: string, name: string): Promise<Pax[]> {
     return this.prisma.pax.findMany({
-      where: { eventId },
-      orderBy: { nom: "asc" },
+      where: { eventId, name: { contains: name, mode: "insensitive" } },
+      orderBy: { name: "asc" },
     });
   }
 
-  async rechercher(eventId: string, nom: string) {
-    return this.prisma.pax.findMany({
-      where: {
-        eventId,
-        nom: { contains: nom, mode: "insensitive" },
-      },
-      orderBy: { nom: "asc" },
-    });
-  }
-
-  async findOneAdmin(id: string) {
+  async findOneAdmin(id: string): Promise<Pax> {
     const pax = await this.prisma.pax.findUnique({ where: { id } });
     if (!pax) throw new NotFoundException("Pax introuvable");
     return pax;
@@ -104,29 +84,24 @@ export class PaxService {
    * Champs sélectionnés explicitement plutôt que filtrés après coup, pour
    * qu'un futur champ sensible ajouté à Pax ne fuite pas ici par défaut.
    */
-  findAllForEventOverview(eventId: string) {
+  findAllForEventOverview(eventId: string): Promise<PaxOverview[]> {
     return this.prisma.pax.findMany({
       where: { eventId },
-      select: {
-        id: true,
-        nom: true,
-        discordHandle: true,
-        commentaire: true,
-        hasVehicle: true,
-        vehicleLendingMode: true,
-        hasDrivingLicense: true,
-        willingToDriveShuttle: true,
-      },
-      orderBy: { nom: "asc" },
+      select: PAX_OVERVIEW_SELECT,
+      orderBy: { name: "asc" },
     });
   }
 
+  buildPersonalLink(accessToken: string): string {
+    const frontendUrl = this.config.get<string>(ENV.FRONTEND_URL) ?? DEFAULT_FRONTEND_URL;
+    return `${frontendUrl.replace(/\/$/, "")}/mon-espace/${accessToken}`;
+  }
+
   private toSubmissionResult(pax: Pax): PaxSubmissionResult {
-    const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:4200";
     return {
-      pax: { id: pax.id, nom: pax.nom },
+      pax: { id: pax.id, name: pax.name },
       accessToken: pax.accessToken,
-      lienPersonnel: `${frontendUrl}/mon-espace/${pax.accessToken}`,
+      personalLink: this.buildPersonalLink(pax.accessToken),
     };
   }
 }

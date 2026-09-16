@@ -1,8 +1,9 @@
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import type { Pax } from "@prisma/client";
 import type { RequestWithPax } from "../guards/pax-token.guard";
 
 /** À utiliser sur une route protégée par PaxTokenGuard. */
-export const CurrentPax = createParamDecorator((_data: unknown, ctx: ExecutionContext) => {
+export const CurrentPax = createParamDecorator((_data: unknown, ctx: ExecutionContext): Pax => {
   const request = ctx.switchToHttp().getRequest<RequestWithPax>();
   return request.pax;
 });

@@ -1,19 +1,22 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Pax } from "@prisma/client";
+import type { DriverAvailabilitySlot, Pax } from "@prisma/client";
+import { toDate } from "../common/utils/dates";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto";
+
+const SLOTS_ORDER = [{ day: "asc" }, { startTime: "asc" }] as const;
 
 @Injectable()
 export class DriverAvailabilityService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Un pax ajoute un créneau où iel serait dispo pour conduire une navette. */
-  createMine(pax: Pax, dto: CreateDriverAvailabilitySlotDto) {
+  createMine(pax: Pax, dto: CreateDriverAvailabilitySlotDto): Promise<DriverAvailabilitySlot> {
     return this.prisma.driverAvailabilitySlot.create({
       data: {
         eventId: pax.eventId,
         paxId: pax.id,
-        day: new Date(dto.day),
+        day: toDate(dto.day),
         startTime: dto.startTime ?? null,
         endTime: dto.endTime ?? null,
         comment: dto.comment ?? null,
@@ -21,17 +24,17 @@ export class DriverAvailabilityService {
     });
   }
 
-  findMine(pax: Pax) {
+  findMine(pax: Pax): Promise<DriverAvailabilitySlot[]> {
     return this.prisma.driverAvailabilitySlot.findMany({
       where: { paxId: pax.id },
-      orderBy: [{ day: "asc" }, { startTime: "asc" }],
+      orderBy: [...SLOTS_ORDER],
     });
   }
 
-  async deleteMine(pax: Pax, id: string) {
+  /** Un pax ne peut supprimer que ses propres créneaux, jamais ceux des autres. */
+  async deleteMine(pax: Pax, id: string): Promise<void> {
     const slot = await this.prisma.driverAvailabilitySlot.findUnique({ where: { id } });
     if (!slot) throw new NotFoundException("Créneau introuvable");
-    // Un pax ne peut supprimer que ses propres créneaux, jamais ceux des autres.
     if (slot.paxId !== pax.id) throw new ForbiddenException("Ce créneau n'est pas le vôtre");
     await this.prisma.driverAvailabilitySlot.delete({ where: { id } });
   }
@@ -40,8 +43,8 @@ export class DriverAvailabilityService {
   findAllForEvent(eventId: string) {
     return this.prisma.driverAvailabilitySlot.findMany({
       where: { eventId },
-      include: { pax: { select: { id: true, nom: true, contactTelephone: true } } },
-      orderBy: [{ day: "asc" }, { startTime: "asc" }],
+      include: { pax: { select: { id: true, name: true, contactPhone: true } } },
+      orderBy: [...SLOTS_ORDER],
     });
   }
 }

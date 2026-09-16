@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
-import { NavettesModule } from "../navettes/navettes.module";
-import { TrajetsModule } from "../trajets/trajets.module";
+import { ShuttlesModule } from "../shuttles/shuttles.module";
+import { TripsModule } from "../trips/trips.module";
 import { PaxController } from "./pax.controller";
 import { PaxService } from "./pax.service";
 
 @Module({
-  imports: [NavettesModule, TrajetsModule],
+  imports: [ShuttlesModule, TripsModule],
   controllers: [PaxController],
   providers: [PaxService],
   exports: [PaxService],
