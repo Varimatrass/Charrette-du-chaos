@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Jest (ts-jest) exécute les tests en CommonJS : on force ce format ici,
+    // y compris pour les rares dépendances publiées uniquement en ESM
+    // (@nestjs/config, @nestjs/mapped-types) que Jest doit transformer.
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "resolvePackageJsonExports": false,
+    "allowJs": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

@@ -72,10 +72,21 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/../tsconfig.spec.json"
+        }
+      ]
     },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!\\.pnpm/@nestjs\\+(config|mapped-types)@)(?!@nestjs/(config|mapped-types)/)"
+    ],
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!testing/**",
+      "!main.ts"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
