@@ -15,6 +15,8 @@ const MIGRATIONS_DIR = join(__dirname, "..", "..", "prisma", "migrations");
  * garantie que la chaîne de migrations fonctionne depuis zéro.
  */
 export default async function globalSetup(): Promise<void> {
+  await ensureDatabaseExists(TEST_DATABASE_URL);
+
   const client = new Client({ connectionString: TEST_DATABASE_URL });
   await client.connect();
   try {
@@ -29,5 +31,35 @@ export default async function globalSetup(): Promise<void> {
     }
   } finally {
     await client.end();
+  }
+}
+
+const DATABASE_DOES_NOT_EXIST = "3D000";
+
+/**
+ * Crée la base de test si elle n'existe pas encore (première exécution en
+ * local : le conteneur Postgres du docker-compose ne connaît que la base
+ * de dev). On passe par la base de maintenance `postgres` du même serveur.
+ */
+async function ensureDatabaseExists(databaseUrl: string): Promise<void> {
+  const probe = new Client({ connectionString: databaseUrl });
+  try {
+    await probe.connect();
+    return;
+  } catch (error) {
+    if ((error as { code?: string }).code !== DATABASE_DOES_NOT_EXIST) throw error;
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+
+  const url = new URL(databaseUrl);
+  const databaseName = url.pathname.replace(/^\//, "");
+  url.pathname = "/postgres";
+  const admin = new Client({ connectionString: url.toString() });
+  await admin.connect();
+  try {
+    await admin.query(`CREATE DATABASE "${databaseName.replace(/"/g, '""')}"`);
+  } finally {
+    await admin.end();
   }
 }
