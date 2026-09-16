@@ -1,5 +1,5 @@
 import type { Event, Pax, Shuttle, Trip } from "@prisma/client";
-import type { PrismaService } from "../../src/prisma/prisma.service";
+import type { PrismaService } from "../../src/prisma/prisma.service.js";
 
 /**
  * Insère directement en base les objets dont un test a besoin comme

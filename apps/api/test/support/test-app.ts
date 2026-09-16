@@ -2,11 +2,11 @@ import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import type { App } from "supertest/types";
-import { AppModule } from "../../src/app.module";
-import { configureApp } from "../../src/app.setup";
-import { ADMIN_KEY_HEADER, PAX_TOKEN_HEADER } from "../../src/common/constants";
-import { PrismaService } from "../../src/prisma/prisma.service";
-import { TEST_ADMIN_KEY } from "./env";
+import { AppModule } from "../../src/app.module.js";
+import { configureApp } from "../../src/app.setup.js";
+import { ADMIN_KEY_HEADER, PAX_TOKEN_HEADER } from "../../src/common/constants.js";
+import { PrismaService } from "../../src/prisma/prisma.service.js";
+import { TEST_ADMIN_KEY } from "./env.js";
 
 export interface TestApp {
   app: INestApplication<App>;

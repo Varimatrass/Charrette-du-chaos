@@ -1,5 +1,5 @@
-import { factories } from "./support/factories";
-import { createTestApp, TestApp } from "./support/test-app";
+import { factories } from "./support/factories.js";
+import { createTestApp, TestApp } from "./support/test-app.js";
 
 describe("Shuttles (e2e)", () => {
   let t: TestApp;

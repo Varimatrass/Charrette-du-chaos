@@ -1,4 +1,4 @@
-import { omitKeys, omitUndefined } from "./objects";
+import { omitKeys, omitUndefined } from "./objects.js";
 
 describe("omitUndefined", () => {
   it("drops undefined values but keeps null and falsy ones", () => {

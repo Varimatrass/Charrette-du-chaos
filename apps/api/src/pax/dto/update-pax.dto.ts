@@ -1,7 +1,7 @@
 import { OmitType, PartialType } from "@nestjs/mapped-types";
 import { IsNotEmpty, IsString, ValidateIf } from "class-validator";
 import type { UpdatePaxInput } from "@desordre/shared-types";
-import { CreatePaxDto } from "./create-pax.dto";
+import { CreatePaxDto } from "./create-pax.dto.js";
 
 /**
  * Mise à jour partielle : un champ absent n'est pas touché, un champ à `null`

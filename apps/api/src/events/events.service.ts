@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Event } from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
-import { toDate } from "../common/utils/dates";
-import { omitUndefined } from "../common/utils/objects";
-import { CreateEventDto } from "./dto/create-event.dto";
-import { UpdateEventDto } from "./dto/update-event.dto";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { toDate } from "../common/utils/dates.js";
+import { omitUndefined } from "../common/utils/objects.js";
+import { CreateEventDto } from "./dto/create-event.dto.js";
+import { UpdateEventDto } from "./dto/update-event.dto.js";
 
 @Injectable()
 export class EventsService {

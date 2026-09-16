@@ -1,5 +1,5 @@
-import { parseCorsOrigins } from "./app.setup";
-import { DEFAULT_FRONTEND_URL } from "./common/constants";
+import { parseCorsOrigins } from "./app.setup.js";
+import { DEFAULT_FRONTEND_URL } from "./common/constants.js";
 
 describe("parseCorsOrigins", () => {
   it("falls back to the dev frontend URL when nothing is configured", () => {

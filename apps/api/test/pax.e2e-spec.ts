@@ -1,6 +1,6 @@
-import { factories } from "./support/factories";
-import { TEST_FRONTEND_URL } from "./support/env";
-import { createTestApp, TestApp } from "./support/test-app";
+import { factories } from "./support/factories.js";
+import { TEST_FRONTEND_URL } from "./support/env.js";
+import { createTestApp, TestApp } from "./support/test-app.js";
 
 describe("Pax (e2e)", () => {
   let t: TestApp;

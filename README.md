@@ -12,7 +12,7 @@ projet Claude "Le désordre" → `spec-navettes-v1.md`.
 ## Stack
 
 - **apps/web** — Angular 20 (standalone, TypeScript strict) + Angular Material
-- **apps/api** — NestJS 11 (TypeScript strict) + Prisma + PostgreSQL
+- **apps/api** — NestJS 12 (TypeScript strict, ESM) + Prisma + PostgreSQL
 - **packages/shared-types** — types et DTOs partagés entre le front et le back
 - **pnpm** workspaces comme gestionnaire de paquets
 
@@ -25,7 +25,7 @@ type Next.js) qui communiquent uniquement via l'API HTTP de `apps/api`.
   [Podman](https://podman.io/docs/installation) (avec le plugin `compose`) —
   c'est ce qui fait tourner la base de données, jamais installée "à la main"
   sur ta machine. Voir plus bas si tu utilises Podman.
-- Node.js ≥ 22.12 et [pnpm](https://pnpm.io/) ≥ 10 (`corepack enable` suffit)
+- Node.js ≥ 22.18 et [pnpm](https://pnpm.io/) ≥ 10 (`corepack enable` suffit)
   — nécessaires seulement si tu veux lancer l'API/le frontend en natif (voir
   "Lancer en développement" ci-dessous). Si tu fais tourner absolument tout
   en conteneurs, tu n'en as pas besoin sur ta machine.
@@ -177,7 +177,7 @@ situations variées.
 ```bash
 pnpm lint            # ESLint sur l'API
 pnpm format:check    # Prettier sur tout le repo (pnpm format pour corriger)
-pnpm test            # tests unitaires de l'API (Jest, base mockée)
+pnpm test            # tests unitaires de l'API (Vitest, base mockée)
 pnpm test:e2e        # tests d'intégration de l'API contre un vrai Postgres
 ```
 

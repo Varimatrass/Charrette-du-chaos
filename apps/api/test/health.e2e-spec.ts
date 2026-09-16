@@ -1,4 +1,4 @@
-import { createTestApp, TestApp } from "./support/test-app";
+import { createTestApp, TestApp } from "./support/test-app.js";
 
 describe("Health & admin auth (e2e)", () => {
   let t: TestApp;

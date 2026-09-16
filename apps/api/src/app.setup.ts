@@ -1,5 +1,5 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
-import { DEFAULT_FRONTEND_URL } from "./common/constants";
+import { DEFAULT_FRONTEND_URL } from "./common/constants.js";
 
 /**
  * Réglages communs à l'appli réelle (main.ts) et aux tests d'intégration :

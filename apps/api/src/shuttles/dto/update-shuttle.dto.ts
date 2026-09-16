@@ -2,7 +2,7 @@ import { OmitType, PartialType } from "@nestjs/mapped-types";
 import { IsIn, IsInt, IsNotEmpty, IsString, Min, ValidateIf } from "class-validator";
 import { Direction } from "@desordre/shared-types";
 import type { UpdateShuttleInput } from "@desordre/shared-types";
-import { CreateShuttleDto } from "./create-shuttle.dto";
+import { CreateShuttleDto } from "./create-shuttle.dto.js";
 
 const REQUIRED_FIELDS = [
   "label",

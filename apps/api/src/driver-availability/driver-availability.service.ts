@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { DriverAvailabilitySlot, Pax } from "@prisma/client";
-import { toDate } from "../common/utils/dates";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto";
+import { toDate } from "../common/utils/dates.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto.js";
 
 const SLOTS_ORDER = [{ day: "asc" }, { startTime: "asc" }] as const;
 

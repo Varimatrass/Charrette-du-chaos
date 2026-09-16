@@ -1,13 +1,13 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { AdminAuthController } from "./auth/admin-auth.controller";
-import { DriverAvailabilityModule } from "./driver-availability/driver-availability.module";
-import { EventsModule } from "./events/events.module";
-import { HealthController } from "./health/health.controller";
-import { PaxModule } from "./pax/pax.module";
-import { PrismaModule } from "./prisma/prisma.module";
-import { ShuttlesModule } from "./shuttles/shuttles.module";
-import { TripsModule } from "./trips/trips.module";
+import { AdminAuthController } from "./auth/admin-auth.controller.js";
+import { DriverAvailabilityModule } from "./driver-availability/driver-availability.module.js";
+import { EventsModule } from "./events/events.module.js";
+import { HealthController } from "./health/health.controller.js";
+import { PaxModule } from "./pax/pax.module.js";
+import { PrismaModule } from "./prisma/prisma.module.js";
+import { ShuttlesModule } from "./shuttles/shuttles.module.js";
+import { TripsModule } from "./trips/trips.module.js";
 
 @Module({
   imports: [

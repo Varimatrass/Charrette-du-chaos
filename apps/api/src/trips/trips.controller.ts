@@ -11,15 +11,15 @@ import {
 } from "@nestjs/common";
 import type { Pax } from "@prisma/client";
 import { Direction } from "@desordre/shared-types";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { CurrentPax } from "../common/decorators/current-pax.decorator";
-import { PaxTokenGuard } from "../common/guards/pax-token.guard";
-import { AssignTripDto } from "./dto/assign-trip.dto";
-import { ListTripsQueryDto } from "./dto/list-trips-query.dto";
-import { SetTripStatusDto } from "./dto/set-trip-status.dto";
-import { UpsertTripDto } from "./dto/upsert-trip.dto";
-import { TripsService } from "./trips.service";
-import { ParseEnumValuePipe } from "../common/pipes/parse-enum-value.pipe";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { CurrentPax } from "../common/decorators/current-pax.decorator.js";
+import { PaxTokenGuard } from "../common/guards/pax-token.guard.js";
+import { AssignTripDto } from "./dto/assign-trip.dto.js";
+import { ListTripsQueryDto } from "./dto/list-trips-query.dto.js";
+import { SetTripStatusDto } from "./dto/set-trip-status.dto.js";
+import { UpsertTripDto } from "./dto/upsert-trip.dto.js";
+import { TripsService } from "./trips.service.js";
+import { ParseEnumValuePipe } from "../common/pipes/parse-enum-value.pipe.js";
 
 @Controller()
 export class TripsController {

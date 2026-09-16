@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { ShuttlesController } from "./shuttles.controller";
-import { ShuttlesService } from "./shuttles.service";
+import { ShuttlesController } from "./shuttles.controller.js";
+import { ShuttlesService } from "./shuttles.service.js";
 
 @Module({
   controllers: [ShuttlesController],

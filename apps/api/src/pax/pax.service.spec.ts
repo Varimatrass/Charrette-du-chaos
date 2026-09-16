@@ -1,8 +1,9 @@
+import type { Mocked } from "vitest";
 import { NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { EVENT_ID, makePax, makeShuttle, makeTrip } from "../testing/fixtures";
-import { asPrismaService, createPrismaMock } from "../testing/prisma-mock";
-import { PaxService, toPublicPax } from "./pax.service";
+import { EVENT_ID, makePax, makeShuttle, makeTrip } from "../testing/fixtures.js";
+import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
+import { PaxService, toPublicPax } from "./pax.service.js";
 
 describe("toPublicPax", () => {
   it("strips the access token and nothing else", () => {
@@ -15,11 +16,11 @@ describe("toPublicPax", () => {
 
 describe("PaxService", () => {
   const prisma = createPrismaMock();
-  const config = { get: jest.fn() } as unknown as jest.Mocked<ConfigService>;
+  const config = { get: vi.fn() } as unknown as Mocked<ConfigService>;
   const service = new PaxService(asPrismaService(prisma), config);
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     config.get.mockReturnValue(undefined);
   });
 

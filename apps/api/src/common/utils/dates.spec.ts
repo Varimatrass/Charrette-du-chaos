@@ -1,4 +1,4 @@
-import { toDate, toDateOrNull } from "./dates";
+import { toDate, toDateOrNull } from "./dates.js";
 
 describe("toDateOrNull", () => {
   it("keeps undefined (field not provided)", () => {

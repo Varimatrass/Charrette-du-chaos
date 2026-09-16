@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { ENV } from "../common/constants";
+import { ENV } from "../common/constants.js";
 
 const CONNECT_MAX_ATTEMPTS = 5;
 const CONNECT_RETRY_DELAY_MS = 2000;

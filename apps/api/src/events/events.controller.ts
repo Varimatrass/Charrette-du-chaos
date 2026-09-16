@@ -8,10 +8,10 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { CreateEventDto } from "./dto/create-event.dto";
-import { UpdateEventDto } from "./dto/update-event.dto";
-import { EventsService } from "./events.service";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { CreateEventDto } from "./dto/create-event.dto.js";
+import { UpdateEventDto } from "./dto/update-event.dto.js";
+import { EventsService } from "./events.service.js";
 
 /**
  * Les évènements n'ont rien de sensible (nom, dates, lieu) : lecture publique

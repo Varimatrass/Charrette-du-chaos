@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Shuttle } from "@prisma/client";
-import { toDate } from "../common/utils/dates";
-import { omitUndefined } from "../common/utils/objects";
-import { computeWaitLevel } from "../common/utils/wait-level";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateShuttleDto } from "./dto/create-shuttle.dto";
-import { UpdateShuttleDto } from "./dto/update-shuttle.dto";
+import { toDate } from "../common/utils/dates.js";
+import { omitUndefined } from "../common/utils/objects.js";
+import { computeWaitLevel } from "../common/utils/wait-level.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateShuttleDto } from "./dto/create-shuttle.dto.js";
+import { UpdateShuttleDto } from "./dto/update-shuttle.dto.js";
 
 /** Tri chronologique commun à toutes les listes de navettes. */
 const SHUTTLES_ORDER = [{ day: "asc" }, { departureTime: "asc" }] as const;

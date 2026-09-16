@@ -12,12 +12,12 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { Pax } from "@prisma/client";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { CurrentPax } from "../common/decorators/current-pax.decorator";
-import { EventIdQueryDto } from "../common/dto/event-id-query.dto";
-import { PaxTokenGuard } from "../common/guards/pax-token.guard";
-import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto";
-import { DriverAvailabilityService } from "./driver-availability.service";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { CurrentPax } from "../common/decorators/current-pax.decorator.js";
+import { EventIdQueryDto } from "../common/dto/event-id-query.dto.js";
+import { PaxTokenGuard } from "../common/guards/pax-token.guard.js";
+import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto.js";
+import { DriverAvailabilityService } from "./driver-availability.service.js";
 
 @Controller()
 export class DriverAvailabilityController {

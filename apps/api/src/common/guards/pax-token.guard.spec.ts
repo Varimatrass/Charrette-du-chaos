@@ -1,8 +1,8 @@
 import { ExecutionContext, UnauthorizedException } from "@nestjs/common";
-import { makePax } from "../../testing/fixtures";
-import { asPrismaService, createPrismaMock } from "../../testing/prisma-mock";
-import { PAX_TOKEN_HEADER } from "../constants";
-import { PaxTokenGuard, RequestWithPax } from "./pax-token.guard";
+import { makePax } from "../../testing/fixtures.js";
+import { asPrismaService, createPrismaMock } from "../../testing/prisma-mock.js";
+import { PAX_TOKEN_HEADER } from "../constants.js";
+import { PaxTokenGuard, RequestWithPax } from "./pax-token.guard.js";
 
 function contextWithToken(token?: string): { context: ExecutionContext; request: RequestWithPax } {
   const request = {
@@ -18,7 +18,7 @@ describe("PaxTokenGuard", () => {
   const prisma = createPrismaMock();
   const guard = new PaxTokenGuard(asPrismaService(prisma));
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => vi.clearAllMocks());
 
   it("attaches the pax to the request when the token is known", async () => {
     const pax = makePax();

@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
-import { ShuttlesModule } from "../shuttles/shuttles.module";
-import { TripsModule } from "../trips/trips.module";
-import { PaxController } from "./pax.controller";
-import { PaxService } from "./pax.service";
+import { ShuttlesModule } from "../shuttles/shuttles.module.js";
+import { TripsModule } from "../trips/trips.module.js";
+import { PaxController } from "./pax.controller.js";
+import { PaxService } from "./pax.service.js";
 
 @Module({
   imports: [ShuttlesModule, TripsModule],

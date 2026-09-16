@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
-import { TEST_DATABASE_URL } from "./env";
+import { TEST_DATABASE_URL } from "./env.js";
 
-const MIGRATIONS_DIR = join(__dirname, "..", "..", "prisma", "migrations");
+const MIGRATIONS_DIR = join(import.meta.dirname, "..", "..", "prisma", "migrations");
 
 /**
  * Avant toute la suite d'intégration : on repart d'un schéma vide et on

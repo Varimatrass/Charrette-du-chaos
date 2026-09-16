@@ -8,9 +8,9 @@ import {
   OTHER_PAX_ID,
   PAX_ID,
   SHUTTLE_ID,
-} from "../testing/fixtures";
-import { asPrismaService, createPrismaMock } from "../testing/prisma-mock";
-import { remainingSeats, ShuttlesService } from "./shuttles.service";
+} from "../testing/fixtures.js";
+import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
+import { remainingSeats, ShuttlesService } from "./shuttles.service.js";
 
 describe("remainingSeats", () => {
   it("is capacity minus assigned trips", () => {
@@ -23,7 +23,7 @@ describe("ShuttlesService", () => {
   const prisma = createPrismaMock();
   const service = new ShuttlesService(asPrismaService(prisma));
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => vi.clearAllMocks());
 
   describe("create", () => {
     it("converts the day and treats an empty driverPaxId as 'no link'", async () => {

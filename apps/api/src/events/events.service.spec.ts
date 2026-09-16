@@ -1,13 +1,13 @@
 import { NotFoundException } from "@nestjs/common";
-import { EVENT_ID, makeEvent } from "../testing/fixtures";
-import { asPrismaService, createPrismaMock } from "../testing/prisma-mock";
-import { EventsService } from "./events.service";
+import { EVENT_ID, makeEvent } from "../testing/fixtures.js";
+import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
+import { EventsService } from "./events.service.js";
 
 describe("EventsService", () => {
   const prisma = createPrismaMock();
   const service = new EventsService(asPrismaService(prisma));
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => vi.clearAllMocks());
 
   it("creates an event with real Date objects for the date columns", async () => {
     prisma.event.create.mockResolvedValue(makeEvent());

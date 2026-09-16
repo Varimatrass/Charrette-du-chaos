@@ -1,9 +1,9 @@
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import { Logger } from "@nestjs/common";
-import { AppModule } from "./app.module";
-import { configureApp } from "./app.setup";
-import { DEFAULT_PORT, ENV } from "./common/constants";
+import { AppModule } from "./app.module.js";
+import { configureApp } from "./app.setup.js";
+import { DEFAULT_PORT, ENV } from "./common/constants.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);

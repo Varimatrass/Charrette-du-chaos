@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from "@nestjs/common";
-import { AdminGuard } from "../common/guards/admin.guard";
+import { AdminGuard } from "../common/guards/admin.guard.js";
 
 /**
  * Permet au frontend de vérifier une clé organisateur·ice sans détourner

@@ -2,11 +2,11 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Pax } from "@prisma/client";
 import type { PaxOverview, PaxSubmissionResult } from "@desordre/shared-types";
-import { DEFAULT_FRONTEND_URL, ENV } from "../common/constants";
-import { omitKeys, omitUndefined } from "../common/utils/objects";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreatePaxDto } from "./dto/create-pax.dto";
-import { UpdatePaxDto } from "./dto/update-pax.dto";
+import { DEFAULT_FRONTEND_URL, ENV } from "../common/constants.js";
+import { omitKeys, omitUndefined } from "../common/utils/objects.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreatePaxDto } from "./dto/create-pax.dto.js";
+import { UpdatePaxDto } from "./dto/update-pax.dto.js";
 
 /** Vue d'un pax sans son jeton d'accès (tout ce qui n'est pas back-office). */
 export type PublicPax = Omit<Pax, "accessToken">;

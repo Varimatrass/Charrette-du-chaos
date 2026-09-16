@@ -1,6 +1,6 @@
 # @desordre/api — API NestJS
 
-API REST de Charrette du Chaos (NestJS 11 + Prisma 7 + PostgreSQL). Voir le
+API REST de Charrette du Chaos (NestJS 12 en ESM + Prisma 7 + PostgreSQL). Voir le
 README à la racine pour l'installation et le lancement ; ce fichier décrit
 l'organisation du code de l'API.
 
@@ -51,10 +51,18 @@ prisma/
 - **Enums :** déclarés dans `packages/shared-types` comme objets `as const`,
   compatibles avec ceux générés par Prisma (pas de cast).
 
+## ESM
+
+Le package est en `"type": "module"` (Nest 12 n'existe qu'en ESM) : les
+imports relatifs portent l'extension `.js` (résolution `nodenext`), et les
+tests tournent avec **Vitest** + SWC (`vitest.config.ts`, `vitest.e2e.config.ts`)
+— SWC émet les métadonnées de décorateurs dont Nest et class-validator ont
+besoin, ce qu'esbuild ne fait pas.
+
 ## Tests
 
 ```bash
-pnpm test              # unitaires (Jest, Prisma mocké) — src/**/*.spec.ts
+pnpm test              # unitaires (Vitest, Prisma mocké) — src/**/*.spec.ts
 pnpm test:cov          # idem avec couverture
 pnpm test:e2e          # intégration (supertest) — test/*.e2e-spec.ts
 ```

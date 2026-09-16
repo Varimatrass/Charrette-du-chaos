@@ -1,8 +1,15 @@
 import { NotFoundException } from "@nestjs/common";
 import { Direction, TripStatus, WaitLevel } from "@desordre/shared-types";
-import { EVENT_ID, makePax, makeShuttle, makeTrip, SHUTTLE_ID, TRIP_ID } from "../testing/fixtures";
-import { asPrismaService, createPrismaMock } from "../testing/prisma-mock";
-import { statusAfterPaxEdit, TripsService } from "./trips.service";
+import {
+  EVENT_ID,
+  makePax,
+  makeShuttle,
+  makeTrip,
+  SHUTTLE_ID,
+  TRIP_ID,
+} from "../testing/fixtures.js";
+import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
+import { statusAfterPaxEdit, TripsService } from "./trips.service.js";
 
 describe("statusAfterPaxEdit", () => {
   it("flags an assigned trip for re-check when the pax edits it", () => {
@@ -20,7 +27,7 @@ describe("TripsService", () => {
   const service = new TripsService(asPrismaService(prisma));
   const pax = makePax();
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => vi.clearAllMocks());
 
   describe("upsertMine", () => {
     it("creates a PENDING trip with explicit nulls for undecided fields", async () => {

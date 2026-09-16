@@ -9,11 +9,11 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { EventIdQueryDto } from "../common/dto/event-id-query.dto";
-import { CreateShuttleDto } from "./dto/create-shuttle.dto";
-import { UpdateShuttleDto } from "./dto/update-shuttle.dto";
-import { ShuttlesService } from "./shuttles.service";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { EventIdQueryDto } from "../common/dto/event-id-query.dto.js";
+import { CreateShuttleDto } from "./dto/create-shuttle.dto.js";
+import { UpdateShuttleDto } from "./dto/update-shuttle.dto.js";
+import { ShuttlesService } from "./shuttles.service.js";
 
 /**
  * Gestion des navettes, réservée au back-office. La vue "planning" pour les

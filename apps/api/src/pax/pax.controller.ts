@@ -10,16 +10,16 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { Pax } from "@prisma/client";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { CurrentPax } from "../common/decorators/current-pax.decorator";
-import { EventIdQueryDto } from "../common/dto/event-id-query.dto";
-import { PaxTokenGuard } from "../common/guards/pax-token.guard";
-import { ShuttlesService } from "../shuttles/shuttles.service";
-import { TripsService } from "../trips/trips.service";
-import { CreatePaxDto } from "./dto/create-pax.dto";
-import { SearchPaxDto } from "./dto/search-pax.dto";
-import { UpdatePaxDto } from "./dto/update-pax.dto";
-import { PaxService } from "./pax.service";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { CurrentPax } from "../common/decorators/current-pax.decorator.js";
+import { EventIdQueryDto } from "../common/dto/event-id-query.dto.js";
+import { PaxTokenGuard } from "../common/guards/pax-token.guard.js";
+import { ShuttlesService } from "../shuttles/shuttles.service.js";
+import { TripsService } from "../trips/trips.service.js";
+import { CreatePaxDto } from "./dto/create-pax.dto.js";
+import { SearchPaxDto } from "./dto/search-pax.dto.js";
+import { UpdatePaxDto } from "./dto/update-pax.dto.js";
+import { PaxService } from "./pax.service.js";
 
 /**
  * Parcours pax : inscription publique, puis auto-service via le lien

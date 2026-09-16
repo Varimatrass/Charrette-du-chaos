@@ -1,5 +1,5 @@
 import { Direction, WaitLevel } from "@desordre/shared-types";
-import { computeWaitLevel, parseTimeToMinutes } from "./wait-level";
+import { computeWaitLevel, parseTimeToMinutes } from "./wait-level.js";
 
 describe("parseTimeToMinutes", () => {
   it.each([

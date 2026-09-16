@@ -1,7 +1,7 @@
 import { ExecutionContext, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ADMIN_KEY_HEADER } from "../constants";
-import { AdminGuard } from "./admin.guard";
+import { ADMIN_KEY_HEADER } from "../constants.js";
+import { AdminGuard } from "./admin.guard.js";
 
 function contextWithHeaders(headers: Record<string, string>): ExecutionContext {
   const request = { header: (name: string) => headers[name.toLowerCase()] };
@@ -11,7 +11,7 @@ function contextWithHeaders(headers: Record<string, string>): ExecutionContext {
 }
 
 function guardWithKey(configuredKey: string | undefined): AdminGuard {
-  const config = { get: jest.fn().mockReturnValue(configuredKey) } as unknown as ConfigService;
+  const config = { get: vi.fn().mockReturnValue(configuredKey) } as unknown as ConfigService;
   return new AdminGuard(config);
 }
 

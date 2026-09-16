@@ -12,7 +12,9 @@ export default defineConfig({
     path: "prisma/migrations",
     // Seed explicite uniquement (comportement Prisma 7) : `pnpm prisma:seed`
     // depuis la racine, ou `prisma db seed` directement dans apps/api.
-    seed: "ts-node prisma/seed.ts",
+    // Node >= 22.18 exécute directement un .ts sans types "non effaçables" (pas
+    // de decorators ni d'enum dans le seed), donc pas besoin de ts-node/tsx.
+    seed: "node prisma/seed.ts",
   },
   datasource: {
     url: env("DATABASE_URL"),

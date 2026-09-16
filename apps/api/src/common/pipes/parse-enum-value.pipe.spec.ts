@@ -1,6 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { Direction } from "@desordre/shared-types";
-import { ParseEnumValuePipe } from "./parse-enum-value.pipe";
+import { ParseEnumValuePipe } from "./parse-enum-value.pipe.js";
 
 describe("ParseEnumValuePipe", () => {
   const pipe = new ParseEnumValuePipe(Direction);

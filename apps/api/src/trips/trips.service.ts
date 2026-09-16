@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Pax, Trip } from "@prisma/client";
 import { Direction, TripStatus } from "@desordre/shared-types";
-import { toDateOrNull } from "../common/utils/dates";
-import { computeWaitLevel } from "../common/utils/wait-level";
-import { PrismaService } from "../prisma/prisma.service";
-import { AssignTripDto } from "./dto/assign-trip.dto";
-import { SetTripStatusDto } from "./dto/set-trip-status.dto";
-import { UpsertTripDto } from "./dto/upsert-trip.dto";
+import { toDateOrNull } from "../common/utils/dates.js";
+import { computeWaitLevel } from "../common/utils/wait-level.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { AssignTripDto } from "./dto/assign-trip.dto.js";
+import { SetTripStatusDto } from "./dto/set-trip-status.dto.js";
+import { UpsertTripDto } from "./dto/upsert-trip.dto.js";
 
 /** Tri chronologique commun à toutes les listes de trajets. */
 const TRIPS_ORDER = [{ day: "asc" }, { time: "asc" }] as const;

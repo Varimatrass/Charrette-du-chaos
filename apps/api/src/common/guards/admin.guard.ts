@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Request } from "express";
-import { ADMIN_KEY_HEADER, ENV } from "../constants";
+import { ADMIN_KEY_HEADER, ENV } from "../constants.js";
 
 /**
  * Garde d'accès au back-office organisateur·ice pour la V1.
