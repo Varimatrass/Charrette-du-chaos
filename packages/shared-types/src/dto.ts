@@ -1,5 +1,8 @@
 import { Direction, TransportMode, TripStatus, VehicleLendingMode } from "./enums";
 
+/** Tous les champs facultatifs, et effaçables avec `null`. */
+export type Nullable<T> = { [K in keyof T]?: T[K] | null };
+
 // ---- Évènement ----
 
 export interface CreateEventInput {
@@ -31,7 +34,11 @@ export interface CreatePaxInput {
   willingToDriveShuttle?: boolean;
 }
 
-export type UpdatePaxInput = Partial<Omit<CreatePaxInput, "eventId">>;
+/**
+ * Mise à jour partielle : un champ absent n'est pas touché, un champ à `null`
+ * est effacé (ex: retirer son email). Le nom, lui, ne peut pas être effacé.
+ */
+export type UpdatePaxInput = { name?: string } & Nullable<Omit<CreatePaxInput, "eventId" | "name">>;
 
 /** Renvoyé une seule fois, juste après la création du pax. */
 export interface PaxSubmissionResult {
@@ -82,7 +89,19 @@ export interface CreateShuttleInput {
   driverPaxId?: string;
 }
 
-export type UpdateShuttleInput = Partial<Omit<CreateShuttleInput, "eventId">>;
+/** Les champs obligatoires d'une navette peuvent être omis mais jamais mis à `null`. */
+export type UpdateShuttleInput = Partial<
+  Pick<
+    CreateShuttleInput,
+    "label" | "day" | "direction" | "departureTime" | "stationArrivalTime" | "capacity"
+  >
+> &
+  Nullable<
+    Pick<
+      CreateShuttleInput,
+      "driverName" | "vehicle" | "venueReturnTime" | "comment" | "driverPaxId"
+    >
+  >;
 
 // ---- Recherche / lookup admin ----
 

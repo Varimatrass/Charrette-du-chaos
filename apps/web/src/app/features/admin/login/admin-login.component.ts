@@ -1,4 +1,3 @@
-import { HttpClient } from "@angular/common/http";
 import { Component, inject, signal } from "@angular/core";
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
 import { Router } from "@angular/router";
@@ -6,8 +5,8 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
-import { catchError, of } from "rxjs";
-import { environment } from "../../../../environments/environment";
+import { AdminApiService } from "../../../core/api/admin-api.service";
+import { appLinks } from "../../../core/app-paths";
 import { AdminAuthService } from "../../../core/services/admin-auth.service";
 
 @Component({
@@ -24,39 +23,34 @@ import { AdminAuthService } from "../../../core/services/admin-auth.service";
   styleUrl: "./admin-login.component.scss",
 })
 export class AdminLoginComponent {
-  private readonly http = inject(HttpClient);
+  private readonly adminApi = inject(AdminApiService);
   private readonly adminAuth = inject(AdminAuthService);
   private readonly router = inject(Router);
 
-  readonly enCours = signal(false);
-  readonly erreur = signal<string | null>(null);
+  readonly submitting = signal(false);
+  readonly error = signal<string | null>(null);
 
   readonly form = new FormGroup({
-    cle: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    key: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
   });
 
-  soumettre(): void {
+  submit(): void {
     if (this.form.invalid) return;
-    const cle = this.form.getRawValue().cle;
+    const key = this.form.getRawValue().key;
 
-    this.enCours.set(true);
-    this.erreur.set(null);
+    this.submitting.set(true);
+    this.error.set(null);
 
-    // On vérifie la clé sur une route admin quelconque : 200 = valide, 401 = refusée.
-    this.http
-      .get(`${environment.apiUrl}/admin/pax`, {
-        params: { eventId: "verification" },
-        headers: { "x-admin-key": cle },
-      })
-      .pipe(catchError(() => of(null)))
-      .subscribe((reponse) => {
-        this.enCours.set(false);
-        if (reponse === null) {
-          this.erreur.set("Clé refusée.");
-          return;
-        }
-        this.adminAuth.setKey(cle);
-        void this.router.navigate(["/admin"]);
-      });
+    // On vérifie la clé auprès de l'API avant de la mémoriser : 200 = valide, 401 = refusée.
+    this.adminApi.checkKey(key).subscribe({
+      next: () => {
+        this.adminAuth.setKey(key);
+        void this.router.navigate(appLinks.admin());
+      },
+      error: () => {
+        this.submitting.set(false);
+        this.error.set("Clé refusée.");
+      },
+    });
   }
 }

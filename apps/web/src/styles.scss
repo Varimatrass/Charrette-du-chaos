@@ -44,3 +44,74 @@ body {
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
 }
+
+// ---------------------------------------------------------------------------
+// Classes utilitaires partagées par les écrans (les composants ne gardent
+// dans leur .scss que ce qui leur est vraiment spécifique).
+// ---------------------------------------------------------------------------
+
+// Page centrée horizontalement (formulaires pax, connexion admin).
+.page-centered {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+// Page "large" du back-office.
+.page-wide {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.card {
+  width: 100%;
+  padding: 1.5rem;
+}
+
+.subtitle {
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: -0.5rem;
+}
+
+.hint {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.9rem;
+}
+
+.error {
+  color: #b3261e;
+}
+
+.empty {
+  color: rgba(0, 0, 0, 0.6);
+  padding: 1rem 0;
+}
+
+// Formulaire en colonne, champs pleine largeur.
+.stacked-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.full-width-table {
+  width: 100%;
+}
+
+// Pastilles d'indicateur d'attente / statut à revérifier.
+.badge-warn {
+  background: #fff3e0;
+}
+
+.badge-warn-strong {
+  background: #ffe0b2;
+}

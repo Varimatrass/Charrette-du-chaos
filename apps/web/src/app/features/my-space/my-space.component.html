@@ -1,13 +1,13 @@
-<div class="page">
-  @if (chargement()) {
+<div class="page-centered">
+  @if (loading()) {
     <mat-spinner></mat-spinner>
-  } @else if (erreur()) {
-    <mat-card class="carte">
-      <p class="erreur">{{ erreur() }}</p>
+  } @else if (error()) {
+    <mat-card class="card">
+      <p class="error">{{ error() }}</p>
     </mat-card>
   } @else {
-    <div class="colonne">
-      <mat-card class="banniere-lien">
+    <div class="column">
+      <mat-card class="link-banner">
         <mat-icon>link</mat-icon>
         <div>
           <strong>Garde ce lien précieusement</strong>
@@ -16,171 +16,167 @@
             veux — même après le début de l'évènement.
           </p>
         </div>
-        <button mat-stroked-button (click)="copierLePersonnel()">
+        <button mat-stroked-button (click)="copyPersonalLink()">
           <mat-icon>content_copy</mat-icon>
           Copier
         </button>
       </mat-card>
 
-      <mat-card class="carte">
+      <mat-card class="card">
         <h2>Navettes de l'évènement</h2>
-        <p class="aide">
+        <p class="hint">
           Planning en lecture seule, pour t'aider à choisir ton horaire de train et savoir avec qui
           tu voyages. La ou les navettes qui te sont déjà assignées sont surlignées.
         </p>
-        @if (navettes().length === 0) {
+        @if (shuttles().length === 0) {
           <p>Aucune navette publiée pour l'instant.</p>
         } @else {
-          <div class="tableau-scroll">
-            <table mat-table [dataSource]="navettes()" class="tableau">
-              <ng-container matColumnDef="libelle">
+          <div class="table-scroll">
+            <table mat-table [dataSource]="shuttles()" class="full-width-table">
+              <ng-container matColumnDef="label">
                 <th mat-header-cell *matHeaderCellDef>Navette</th>
-                <td mat-cell *matCellDef="let n">{{ n.libelle }}</td>
+                <td mat-cell *matCellDef="let s">{{ s.label }}</td>
               </ng-container>
-              <ng-container matColumnDef="sens">
+              <ng-container matColumnDef="direction">
                 <th mat-header-cell *matHeaderCellDef>Sens</th>
-                <td mat-cell *matCellDef="let n">
-                  {{ n.sens === Sens.ALLER ? "Aller" : "Retour" }}
-                </td>
+                <td mat-cell *matCellDef="let s">{{ s.direction | directionLabel }}</td>
               </ng-container>
-              <ng-container matColumnDef="jour">
+              <ng-container matColumnDef="day">
                 <th mat-header-cell *matHeaderCellDef>Jour</th>
-                <td mat-cell *matCellDef="let n">{{ n.jour | date: "d MMM" }}</td>
+                <td mat-cell *matCellDef="let s">{{ s.day | date: "d MMM" }}</td>
               </ng-container>
-              <ng-container matColumnDef="heures">
+              <ng-container matColumnDef="times">
                 <th mat-header-cell *matHeaderCellDef>Horaires</th>
-                <td mat-cell *matCellDef="let n">
-                  {{ n.heureDepart }} → gare {{ n.heureArriveeGare }}
+                <td mat-cell *matCellDef="let s">
+                  {{ s.departureTime }} → gare {{ s.stationArrivalTime }}
                 </td>
               </ng-container>
-              <ng-container matColumnDef="conducteur">
+              <ng-container matColumnDef="driver">
                 <th mat-header-cell *matHeaderCellDef>Conducteur·ice</th>
-                <td mat-cell *matCellDef="let n">
-                  {{ n.conducteur || "?" }}
-                  @if (n.vehicule) {
-                    <span class="vehicule">({{ n.vehicule }})</span>
+                <td mat-cell *matCellDef="let s">
+                  {{ s.driverName || "?" }}
+                  @if (s.vehicle) {
+                    <span class="secondary">({{ s.vehicle }})</span>
                   }
-                  @if (n.driverContactPhone) {
+                  @if (s.driverContactPhone) {
                     <br />
-                    <span class="telephone-conducteur">📞 {{ n.driverContactPhone }}</span>
+                    <span class="secondary">📞 {{ s.driverContactPhone }}</span>
                   }
                 </td>
               </ng-container>
-              <ng-container matColumnDef="places">
+              <ng-container matColumnDef="seats">
                 <th mat-header-cell *matHeaderCellDef>Places restantes</th>
-                <td mat-cell *matCellDef="let n">{{ n.placesRestantes }} / {{ n.capacite }}</td>
+                <td mat-cell *matCellDef="let s">{{ s.remainingSeats }} / {{ s.capacity }}</td>
               </ng-container>
-              <ng-container matColumnDef="passagers">
+              <ng-container matColumnDef="passengers">
                 <th mat-header-cell *matHeaderCellDef>Avec qui</th>
-                <td mat-cell *matCellDef="let n">
-                  @if (n.passagers.length === 0) {
-                    <span class="aide">personne pour l'instant</span>
+                <td mat-cell *matCellDef="let s">
+                  @if (s.passengers.length === 0) {
+                    <span class="hint">personne pour l'instant</span>
                   } @else {
-                    {{ nomsPassagers(n.passagers) }}
+                    {{ passengerNames(s.passengers) }}
                   }
                 </td>
               </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="colonnesNavettes"></tr>
+              <tr mat-header-row *matHeaderRowDef="shuttleColumns"></tr>
               <tr
                 mat-row
-                *matRowDef="let row; columns: colonnesNavettes"
-                [class.ma-navette]="estMaNavette(row.id)"
+                *matRowDef="let row; columns: shuttleColumns"
+                [class.my-shuttle]="isMyShuttle(row.id)"
               ></tr>
             </table>
           </div>
         }
       </mat-card>
 
-      <mat-card class="carte">
+      <mat-card class="card">
         <h2>Qui vient</h2>
-        <p class="aide">
+        <p class="hint">
           Les autres paxs de l'évènement, en lecture seule — jamais leurs mails ni leurs numéros de
           téléphone.
         </p>
-        @if (paxsEvenement().length === 0) {
+        @if (eventPaxs().length === 0) {
           <p>Personne d'autre pour l'instant.</p>
         } @else {
-          <div class="tableau-scroll">
-            <table mat-table [dataSource]="paxsEvenement()" class="tableau">
-              <ng-container matColumnDef="nom">
+          <div class="table-scroll">
+            <table mat-table [dataSource]="eventPaxs()" class="full-width-table">
+              <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Nom</th>
-                <td mat-cell *matCellDef="let p">{{ p.nom }}</td>
+                <td mat-cell *matCellDef="let p">{{ p.name }}</td>
               </ng-container>
               <ng-container matColumnDef="discord">
                 <th mat-header-cell *matHeaderCellDef>Discord</th>
                 <td mat-cell *matCellDef="let p">{{ p.discordHandle || "—" }}</td>
               </ng-container>
-              <ng-container matColumnDef="vehicule">
+              <ng-container matColumnDef="vehicle">
                 <th mat-header-cell *matHeaderCellDef>Véhicule / conduite</th>
-                <td mat-cell *matCellDef="let p">{{ vehiculeResume(p) }}</td>
+                <td mat-cell *matCellDef="let p">{{ describeVehicleInfo(p) }}</td>
               </ng-container>
-              <ng-container matColumnDef="commentaire">
+              <ng-container matColumnDef="comment">
                 <th mat-header-cell *matHeaderCellDef>Commentaire</th>
-                <td mat-cell *matCellDef="let p">{{ p.commentaire || "—" }}</td>
+                <td mat-cell *matCellDef="let p">{{ p.comment || "—" }}</td>
               </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="colonnesPaxs"></tr>
-              <tr mat-row *matRowDef="let row; columns: colonnesPaxs"></tr>
+              <tr mat-header-row *matHeaderRowDef="paxColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: paxColumns"></tr>
             </table>
           </div>
         }
       </mat-card>
 
-      <mat-card class="carte">
+      <mat-card class="card">
         <h2>Tous les trajets</h2>
-        <p class="aide">
+        <p class="hint">
           Vue d'ensemble en lecture seule de tout l'évènement, pour t'aider à te coordonner.
         </p>
-        @if (trajetsEvenement().length === 0) {
+        @if (eventTrips().length === 0) {
           <p>Aucun trajet renseigné pour l'instant.</p>
         } @else {
-          <div class="tableau-scroll">
-            <table mat-table [dataSource]="trajetsEvenement()" class="tableau">
+          <div class="table-scroll">
+            <table mat-table [dataSource]="eventTrips()" class="full-width-table">
               <ng-container matColumnDef="pax">
                 <th mat-header-cell *matHeaderCellDef>Pax</th>
-                <td mat-cell *matCellDef="let t">{{ t.paxNom }}</td>
+                <td mat-cell *matCellDef="let t">{{ t.paxName }}</td>
               </ng-container>
-              <ng-container matColumnDef="sens">
+              <ng-container matColumnDef="direction">
                 <th mat-header-cell *matHeaderCellDef>Sens</th>
-                <td mat-cell *matCellDef="let t">
-                  {{ t.sens === Sens.ALLER ? "Aller" : "Retour" }}
-                </td>
+                <td mat-cell *matCellDef="let t">{{ t.direction | directionLabel }}</td>
               </ng-container>
               <ng-container matColumnDef="mode">
                 <th mat-header-cell *matHeaderCellDef>Mode</th>
-                <td mat-cell *matCellDef="let t">{{ libelleMode(t.mode) }}</td>
+                <td mat-cell *matCellDef="let t">{{ t.mode | transportModeLabel }}</td>
               </ng-container>
-              <ng-container matColumnDef="quand">
+              <ng-container matColumnDef="when">
                 <th mat-header-cell *matHeaderCellDef>Jour / heure</th>
                 <td mat-cell *matCellDef="let t">
-                  {{ t.jour ? (t.jour | date: "d MMM") : "?" }} {{ t.heure || "" }}
+                  {{ t.day ? (t.day | date: "d MMM") : "?" }} {{ t.time || "" }}
                 </td>
               </ng-container>
-              <ng-container matColumnDef="statut">
+              <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Statut</th>
-                <td mat-cell *matCellDef="let t">{{ libelleStatut(t.statut) }}</td>
+                <td mat-cell *matCellDef="let t">{{ t.status | tripStatusLabel }}</td>
               </ng-container>
-              <ng-container matColumnDef="navette">
+              <ng-container matColumnDef="shuttle">
                 <th mat-header-cell *matHeaderCellDef>Navette</th>
-                <td mat-cell *matCellDef="let t">{{ t.navetteLibelle || "—" }}</td>
+                <td mat-cell *matCellDef="let t">{{ t.shuttleLabel || "—" }}</td>
               </ng-container>
 
-              <tr mat-header-row *matHeaderRowDef="colonnesTrajets"></tr>
-              <tr mat-row *matRowDef="let row; columns: colonnesTrajets"></tr>
+              <tr mat-header-row *matHeaderRowDef="tripColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: tripColumns"></tr>
             </table>
           </div>
         }
       </mat-card>
 
-      <mat-card class="carte">
-        <h1>Bonjour {{ pax()?.nom }} 👋</h1>
+      <mat-card class="card">
+        <h1>Bonjour {{ pax()?.name }} 👋</h1>
 
         <h2>Mes infos</h2>
-        <form [formGroup]="infosForm" (ngSubmit)="enregistrerInfos()">
+        <form [formGroup]="personalInfoForm" (ngSubmit)="savePersonalInfo()" class="stacked-form">
           <mat-form-field appearance="outline">
             <mat-label>Nom</mat-label>
-            <input matInput formControlName="nom" required />
+            <input matInput formControlName="name" required />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Email</mat-label>
@@ -192,74 +188,85 @@
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Téléphone</mat-label>
-            <input matInput formControlName="contactTelephone" />
+            <input matInput formControlName="contactPhone" />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Commentaire</mat-label>
-            <textarea matInput formControlName="commentaire" rows="2"></textarea>
+            <textarea matInput formControlName="comment" rows="2"></textarea>
           </mat-form-field>
-          <button mat-flat-button color="primary" type="submit" [disabled]="enregistrementInfos()">
+          <button mat-flat-button color="primary" type="submit" [disabled]="savingInfo()">
             Enregistrer mes infos
           </button>
         </form>
       </mat-card>
 
-      @for (sens of [Sens.ALLER, Sens.RETOUR]; track sens) {
-        <mat-card class="carte">
-          <h2>{{ sens === Sens.ALLER ? "Trajet aller" : "Trajet retour" }}</h2>
-          <p class="aide">
+      @for (direction of directions; track direction) {
+        <mat-card class="card">
+          <h2>Trajet {{ (direction | directionLabel).toLowerCase() }}</h2>
+          <p class="hint">
             Pas encore d'horaire précis ? Reviens quand tu veux compléter ou changer cette info, y
             compris à la dernière minute.
           </p>
 
-          @if (navetteAssignee(sens); as navette) {
-            <p class="info-navette">
-              🚐 Navette assignée : <strong>{{ navette.libelle }}</strong> — départ à
-              {{ navette.heureDepart }}
+          @if (assignedShuttle(direction); as shuttle) {
+            <p class="notice notice-ok">
+              🚐 Navette assignée : <strong>{{ shuttle.label }}</strong> — départ à
+              {{ shuttle.departureTime }}
             </p>
           }
-          @if (statutTrajet(sens) === StatutTrajet.A_REVERIFIER) {
-            <p class="info-reverif">
+          @if (tripStatus(direction) === TripStatus.TO_RECHECK) {
+            <p class="notice notice-warn">
               Tes horaires ont changé depuis ton assignation à une navette : l'organisation va
               revérifier que ça tient toujours.
             </p>
           }
 
-          <form [formGroup]="trajetForms[sens]" (ngSubmit)="enregistrerTrajet(sens)">
+          <form
+            [formGroup]="tripForms[direction]"
+            (ngSubmit)="saveTrip(direction)"
+            class="stacked-form"
+          >
             <mat-form-field appearance="outline">
               <mat-label>Moyen de transport</mat-label>
               <mat-select formControlName="mode">
-                <mat-option [value]="ModeTransport.TRAIN">Train</mat-option>
-                <mat-option [value]="ModeTransport.COVOITURAGE">Covoiturage</mat-option>
-                <mat-option [value]="ModeTransport.AUTRE">Autre</mat-option>
+                <mat-option [value]="null">Je sais pas encore</mat-option>
+                <mat-option [value]="TransportMode.TRAIN">{{
+                  TransportMode.TRAIN | transportModeLabel
+                }}</mat-option>
+                <mat-option [value]="TransportMode.CARPOOL">{{
+                  TransportMode.CARPOOL | transportModeLabel
+                }}</mat-option>
+                <mat-option [value]="TransportMode.OTHER">{{
+                  TransportMode.OTHER | transportModeLabel
+                }}</mat-option>
               </mat-select>
             </mat-form-field>
 
-            @if (trajetForms[sens].value.mode === ModeTransport.TRAIN) {
+            @if (tripForms[direction].value.mode === TransportMode.TRAIN) {
               <mat-form-field appearance="outline">
                 <mat-label>Gare</mat-label>
-                <input matInput formControlName="gare" />
+                <input matInput formControlName="station" />
               </mat-form-field>
             }
 
             <mat-form-field appearance="outline">
               <mat-label>Jour</mat-label>
-              <input matInput type="date" formControlName="jour" />
+              <input matInput type="date" formControlName="day" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Heure</mat-label>
-              <input matInput type="time" formControlName="heure" />
+              <input matInput type="time" formControlName="time" />
             </mat-form-field>
             <mat-form-field appearance="outline">
               <mat-label>Commentaire</mat-label>
-              <textarea matInput formControlName="commentaire" rows="2"></textarea>
+              <textarea matInput formControlName="comment" rows="2"></textarea>
             </mat-form-field>
 
             <button
               mat-flat-button
               color="primary"
               type="submit"
-              [disabled]="enregistrementTrajet() === sens"
+              [disabled]="savingTrip() === direction"
             >
               Enregistrer ce trajet
             </button>
@@ -268,31 +275,31 @@
       }
 
       @if (pax()?.willingToDriveShuttle) {
-        <mat-card class="carte">
+        <mat-card class="card">
           <h2>Mes disponibilités pour conduire une navette</h2>
-          <p class="aide">
+          <p class="hint">
             Tu as dit être partant·e pour conduire une navette — indique ici les jours (et créneaux,
             si tu les connais déjà) où ça te conviendrait. L'organisation pioche dedans pour te
             proposer une navette, mais ça reste indicatif : tu peux ajouter ou retirer un créneau à
             tout moment.
           </p>
 
-          @if (mesDisponibilites().length > 0) {
-            <ul class="liste-disponibilites">
-              @for (d of mesDisponibilites(); track d.id) {
+          @if (myAvailabilitySlots().length > 0) {
+            <ul class="slot-list">
+              @for (slot of myAvailabilitySlots(); track slot.id) {
                 <li>
-                  {{ d.day | date: "d MMM" }}
-                  @if (d.startTime || d.endTime) {
-                    ({{ d.startTime || "?" }}–{{ d.endTime || "?" }})
+                  {{ slot.day | date: "d MMM" }}
+                  @if (slot.startTime || slot.endTime) {
+                    ({{ slot.startTime || "?" }}–{{ slot.endTime || "?" }})
                   }
-                  @if (d.comment) {
-                    — {{ d.comment }}
+                  @if (slot.comment) {
+                    — {{ slot.comment }}
                   }
                   <button
                     mat-icon-button
                     type="button"
                     aria-label="Supprimer ce créneau"
-                    (click)="supprimerDisponibilite(d.id)"
+                    (click)="deleteAvailabilitySlot(slot.id)"
                   >
                     <mat-icon>close</mat-icon>
                   </button>
@@ -301,7 +308,11 @@
             </ul>
           }
 
-          <form [formGroup]="disponibiliteForm" (ngSubmit)="ajouterDisponibilite()">
+          <form
+            [formGroup]="availabilitySlotForm"
+            (ngSubmit)="addAvailabilitySlot()"
+            class="stacked-form"
+          >
             <mat-form-field appearance="outline">
               <mat-label>Jour</mat-label>
               <input matInput type="date" formControlName="day" required />
@@ -322,7 +333,7 @@
               mat-flat-button
               color="primary"
               type="submit"
-              [disabled]="enregistrementDisponibilite()"
+              [disabled]="savingAvailabilitySlot()"
             >
               Ajouter ce créneau
             </button>

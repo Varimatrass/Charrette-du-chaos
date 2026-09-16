@@ -1,0 +1,147 @@
+<div class="header">
+  <button mat-flat-button color="primary" (click)="toggleForm()">
+    {{ showForm() ? "Annuler" : "Nouvelle navette" }}
+  </button>
+</div>
+
+@if (showForm()) {
+  <form [formGroup]="form" (ngSubmit)="submit()" class="shuttle-form">
+    <h3 class="full-width">
+      {{ editingShuttleId() ? "Modifier la navette" : "Nouvelle navette" }}
+    </h3>
+    <mat-form-field appearance="outline">
+      <mat-label>Libellé</mat-label>
+      <input matInput formControlName="label" placeholder="Navette 1 aller vendredi 14h45" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Sens</mat-label>
+      <mat-select formControlName="direction">
+        <mat-option [value]="Direction.OUTBOUND">Aller (vers le lieu)</mat-option>
+        <mat-option [value]="Direction.RETURN">Retour (vers la gare)</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Jour</mat-label>
+      <input matInput type="date" formControlName="day" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Conducteur·ice</mat-label>
+      <input matInput formControlName="driverName" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Lié·e à un pax (optionnel)</mat-label>
+      <mat-select
+        formControlName="driverPaxId"
+        (selectionChange)="onDriverPaxSelected($event.value)"
+      >
+        <mat-option value="">Non renseigné</mat-option>
+        @if (availablePaxsForSelectedDay().length > 0) {
+          <mat-optgroup label="Partant·es ce jour-là">
+            @for (slot of availablePaxsForSelectedDay(); track slot.id) {
+              <mat-option [value]="slot.pax.id">
+                {{ slot.pax.name }}
+                @if (slot.startTime || slot.endTime) {
+                  ({{ slot.startTime || "?" }}–{{ slot.endTime || "?" }})
+                }
+              </mat-option>
+            }
+          </mat-optgroup>
+        }
+        <mat-optgroup label="Tous les pax">
+          @for (pax of eventPaxs(); track pax.id) {
+            <mat-option [value]="pax.id">{{ pax.name }}</mat-option>
+          }
+        </mat-optgroup>
+      </mat-select>
+      <mat-hint>Permet d'afficher son téléphone aux pax de cette navette.</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Véhicule</mat-label>
+      <input matInput formControlName="vehicle" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure de départ (du lieu)</mat-label>
+      <input matInput type="time" formControlName="departureTime" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure d'arrivée en gare</mat-label>
+      <input matInput type="time" formControlName="stationArrivalTime" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Heure de retour au lieu (optionnel)</mat-label>
+      <input matInput type="time" formControlName="venueReturnTime" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Capacité</mat-label>
+      <input matInput type="number" min="1" formControlName="capacity" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Commentaire</mat-label>
+      <textarea matInput formControlName="comment" rows="2"></textarea>
+    </mat-form-field>
+    <button mat-flat-button color="primary" type="submit" class="full-width">
+      {{ editingShuttleId() ? "Enregistrer les modifications" : "Créer la navette" }}
+    </button>
+  </form>
+}
+
+<table mat-table [dataSource]="shuttles()" class="full-width-table">
+  <ng-container matColumnDef="label">
+    <th mat-header-cell *matHeaderCellDef>Navette</th>
+    <td mat-cell *matCellDef="let s">{{ s.label }}</td>
+  </ng-container>
+  <ng-container matColumnDef="direction">
+    <th mat-header-cell *matHeaderCellDef>Sens</th>
+    <td mat-cell *matCellDef="let s">{{ s.direction | directionLabel }}</td>
+  </ng-container>
+  <ng-container matColumnDef="day">
+    <th mat-header-cell *matHeaderCellDef>Jour</th>
+    <td mat-cell *matCellDef="let s">{{ s.day | date: "d MMM" }}</td>
+  </ng-container>
+  <ng-container matColumnDef="times">
+    <th mat-header-cell *matHeaderCellDef>Horaires</th>
+    <td mat-cell *matCellDef="let s">{{ s.departureTime }} → gare {{ s.stationArrivalTime }}</td>
+  </ng-container>
+  <ng-container matColumnDef="seats">
+    <th mat-header-cell *matHeaderCellDef>Places restantes</th>
+    <td mat-cell *matCellDef="let s">{{ s.remainingSeats }} / {{ s.capacity }}</td>
+  </ng-container>
+  <ng-container matColumnDef="actions">
+    <th mat-header-cell *matHeaderCellDef></th>
+    <td mat-cell *matCellDef="let s">
+      <button mat-button (click)="openEditForm(s)">Modifier</button>
+      <button mat-button (click)="toggleDetail(s.id)">
+        {{ openedShuttle()?.id === s.id ? "Masquer" : "Voir les passager·es" }}
+      </button>
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="columns"></tr>
+  <tr mat-row *matRowDef="let row; columns: columns"></tr>
+</table>
+
+@if (openedShuttle(); as shuttle) {
+  <div class="passengers-detail">
+    <h3>Passager·es de {{ shuttle.label }}</h3>
+    @if (shuttle.passengers.length === 0) {
+      <p>Personne d'assigné pour l'instant.</p>
+    } @else {
+      <ul>
+        @for (trip of shuttle.passengers; track trip.id) {
+          <li>
+            {{ trip.pax.name }} — {{ trip.time || "heure inconnue" }}
+            @if (trip.waitLevel && trip.waitLevel !== WaitLevel.OK) {
+              <span
+                class="wait-badge"
+                [class.badge-warn]="trip.waitLevel === WaitLevel.MEDIUM"
+                [class.badge-warn-strong]="trip.waitLevel === WaitLevel.HIGH"
+              >
+                attente {{ trip.waitLevel | waitLevelLabel }}
+              </span>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

@@ -8,7 +8,8 @@ import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatListModule } from "@angular/material/list";
 import type { Event } from "@desordre/shared-types";
-import { ApiService } from "../../../core/services/api.service";
+import { EventsApiService } from "../../../core/api/events-api.service";
+import { appLinks } from "../../../core/app-paths";
 
 @Component({
   selector: "app-admin-events",
@@ -27,36 +28,41 @@ import { ApiService } from "../../../core/services/api.service";
   styleUrl: "./admin-events.component.scss",
 })
 export class AdminEventsComponent {
-  private readonly api = inject(ApiService);
+  private readonly eventsApi = inject(EventsApiService);
 
   readonly events = signal<Event[]>([]);
-  readonly afficherFormulaire = signal(false);
+  readonly showForm = signal(false);
+  readonly eventLink = appLinks.adminEvent;
 
   readonly form = new FormGroup({
-    nom: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    dateDebut: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    dateFin: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    lieu: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    gareReference: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    name: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    startDate: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    endDate: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    location: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    referenceStation: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
   });
 
   constructor() {
-    this.charger();
+    this.load();
   }
 
-  private charger(): void {
-    this.api.listerEvents().subscribe((events) => this.events.set(events));
+  private load(): void {
+    this.eventsApi.list().subscribe((events) => this.events.set(events));
   }
 
-  creer(): void {
+  toggleForm(): void {
+    this.showForm.update((shown) => !shown);
+  }
+
+  create(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
     }
-    this.api.creerEvent(this.form.getRawValue()).subscribe(() => {
+    this.eventsApi.create(this.form.getRawValue()).subscribe(() => {
       this.form.reset();
-      this.afficherFormulaire.set(false);
-      this.charger();
+      this.showForm.set(false);
+      this.load();
     });
   }
 }
