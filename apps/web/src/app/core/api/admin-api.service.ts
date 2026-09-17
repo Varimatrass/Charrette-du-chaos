@@ -3,9 +3,14 @@ import { inject, Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import type {
   AssignTripInput,
+  Car,
+  CarOverview,
   CreateShuttleInput,
+  Direction,
   DriverAvailabilitySlotWithPax,
   PaxAdmin,
+  Shuttle as ShuttleModel,
+  Station,
   SetTripStatusInput,
   Shuttle,
   ShuttleWithPassengers,
@@ -16,6 +21,12 @@ import type {
   UpdateShuttleInput,
 } from "@desordre/shared-types";
 import { ADMIN_KEY_HEADER, apiUrl } from "./api-base";
+
+/** Un pax vu du back-office, avec sa voiture et ses trajets (navette, gare, voiture liées). */
+export type PaxAdminWithTrips = PaxAdmin & {
+  car: Car | null;
+  trips: (Trip & { shuttle: ShuttleModel | null; station: Station | null; car: Car | null })[];
+};
 
 /**
  * Back-office organisateur·ice : toutes ces routes sont sous `/admin/`, la
@@ -37,8 +48,14 @@ export class AdminApiService {
 
   // ---- Pax ----
 
-  listPaxs(eventId: string): Observable<PaxAdmin[]> {
-    return this.http.get<PaxAdmin[]>(apiUrl("admin/pax"), { params: { eventId } });
+  listPaxs(eventId: string): Observable<PaxAdminWithTrips[]> {
+    return this.http.get<PaxAdminWithTrips[]>(apiUrl("admin/pax"), { params: { eventId } });
+  }
+
+  // ---- Voitures ----
+
+  listCars(eventId: string): Observable<CarOverview[]> {
+    return this.http.get<CarOverview[]>(apiUrl("admin/cars"), { params: { eventId } });
   }
 
   searchPaxs(eventId: string, name: string): Observable<PaxAdmin[]> {
@@ -76,10 +93,11 @@ export class AdminApiService {
 
   // ---- Trajets ----
 
-  listTrips(eventId: string, status?: TripStatus): Observable<TripWithPax[]> {
-    return this.http.get<TripWithPax[]>(apiUrl("admin/trips"), {
-      params: status ? { eventId, status } : { eventId },
-    });
+  listTrips(eventId: string, filters: { status?: TripStatus; direction?: Direction } = {}) {
+    const params: Record<string, string> = { eventId };
+    if (filters.status) params["status"] = filters.status;
+    if (filters.direction) params["direction"] = filters.direction;
+    return this.http.get<TripWithPax[]>(apiUrl("admin/trips"), { params });
   }
 
   assignTrip(id: string, input: AssignTripInput): Observable<Trip> {
