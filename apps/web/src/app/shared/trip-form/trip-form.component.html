@@ -1,0 +1,76 @@
+<div [formGroup]="form" class="trip-form">
+  <mat-form-field appearance="outline">
+    <mat-label>Moyen de transport</mat-label>
+    <mat-select formControlName="mode" (selectionChange)="applyDefaultDay()">
+      <mat-option [value]="null">Je sais pas encore</mat-option>
+      <mat-option [value]="TransportMode.TRAIN">{{
+        TransportMode.TRAIN | transportModeLabel
+      }}</mat-option>
+      <mat-option [value]="TransportMode.CARPOOL">{{
+        TransportMode.CARPOOL | transportModeLabel
+      }}</mat-option>
+      <mat-option [value]="TransportMode.OTHER">{{
+        TransportMode.OTHER | transportModeLabel
+      }}</mat-option>
+    </mat-select>
+  </mat-form-field>
+
+  @if (mode() === TransportMode.TRAIN) {
+    <app-entity-select
+      [label]="isOutbound() ? 'Gare d\'arrivée' : 'Gare de départ'"
+      [options]="stationOptions()"
+      [(value)]="stationId"
+      [allowCreate]="true"
+      createLabel="Ajouter la gare"
+      emptyLabel="Pas encore décidé"
+      hint="Choisis une gare de la liste, ou tape son nom si elle n'y est pas."
+      (create)="onCreateStation($event)"
+    />
+  }
+
+  @if (mode() === TransportMode.CARPOOL) {
+    <mat-form-field appearance="outline">
+      <mat-label>{{ isOutbound() ? "D'où tu pars" : "Où tu rentres" }}</mat-label>
+      <input matInput formControlName="origin" placeholder="Ville, quartier…" />
+    </mat-form-field>
+
+    <p class="question">Tu viens comment ?</p>
+    <mat-radio-group formControlName="carpoolRole">
+      <mat-radio-button [value]="CarpoolRole.DRIVER">Avec ma voiture</mat-radio-button>
+      <mat-radio-button [value]="CarpoolRole.PASSENGER">En passager·e</mat-radio-button>
+    </mat-radio-group>
+
+    @if (carpoolRole() === CarpoolRole.PASSENGER) {
+      <p class="question">Tu as déjà un covoit ?</p>
+      <mat-radio-group formControlName="passengerStatus">
+        <mat-radio-button value="HAS_CAR">Oui, j'ai déjà une place</mat-radio-button>
+        <mat-radio-button value="LOOKING">Non, je cherche un covoit</mat-radio-button>
+      </mat-radio-group>
+
+      @if (passengerStatus() === "HAS_CAR") {
+        <app-entity-select
+          label="Dans quelle voiture ?"
+          [options]="carOptions()"
+          [(value)]="carId"
+          emptyLabel="La voiture n'est pas encore dans la liste"
+          hint="Si la voiture n'est pas encore déclarée, laisse vide : tu pourras revenir la choisir plus tard."
+        />
+      }
+    }
+  }
+
+  <mat-form-field appearance="outline">
+    <mat-label>Jour (si tu le connais déjà)</mat-label>
+    <input matInput type="date" formControlName="day" />
+  </mat-form-field>
+  <mat-form-field appearance="outline">
+    <mat-label>{{
+      mode() === TransportMode.TRAIN ? "Heure du train" : "Heure (si tu la connais déjà)"
+    }}</mat-label>
+    <input matInput type="time" formControlName="time" />
+  </mat-form-field>
+  <mat-form-field appearance="outline">
+    <mat-label>Commentaire (optionnel)</mat-label>
+    <textarea matInput formControlName="comment" rows="2"></textarea>
+  </mat-form-field>
+</div>

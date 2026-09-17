@@ -1,0 +1,69 @@
+<div class="table-toolbar">
+  <mat-form-field appearance="outline" class="search">
+    <mat-label>Chercher un pax</mat-label>
+    <input matInput [formControl]="searchControl" />
+  </mat-form-field>
+</div>
+
+<div class="table-scroll">
+  <table mat-table [dataSource]="filteredRows()" class="full-width-table">
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Pax</th>
+      <td mat-cell *matCellDef="let row">
+        {{ row.name }}
+        @if (row.isMe) {
+          <span class="me-badge">moi</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="outbound">
+      <th mat-header-cell *matHeaderCellDef>Aller</th>
+      <td mat-cell *matCellDef="let row">{{ row.outbound }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="return">
+      <th mat-header-cell *matHeaderCellDef>Retour</th>
+      <td mat-cell *matCellDef="let row">{{ row.return }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="contact">
+      <th mat-header-cell *matHeaderCellDef>Contact</th>
+      <td mat-cell *matCellDef="let row">
+        {{ row.contact }}
+        @if (row.discordHandle) {
+          <span class="secondary">· {{ row.discordHandle }}</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="comment">
+      <th mat-header-cell *matHeaderCellDef>Commentaire</th>
+      <td mat-cell *matCellDef="let row">{{ row.comment || "—" }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="link">
+      <th mat-header-cell *matHeaderCellDef>Lien personnel</th>
+      <td mat-cell *matCellDef="let row">
+        <button mat-button type="button" (click)="toggleLink(row.id)">
+          {{ openedPaxId() === row.id ? "Masquer" : "Voir le lien" }}
+        </button>
+        @if (openedPaxId() === row.id) {
+          <div class="link-detail">
+            <code>{{ personalLinkOf(row) }}</code>
+            <button mat-icon-button type="button" aria-label="Copier" (click)="copyLink(row)">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+          </div>
+        }
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="columns()"></tr>
+    <tr mat-row *matRowDef="let row; columns: columns()" [class.me-row]="row.isMe"></tr>
+  </table>
+</div>
+
+@if (!loading() && filteredRows().length === 0) {
+  <p class="empty">Aucun pax pour l'instant.</p>
+}
