@@ -1,4 +1,4 @@
-<div class="page-wide">
+<div class="events-page">
   <div class="header">
     <h1>Évènements</h1>
     <button mat-flat-button color="primary" (click)="toggleForm()">Nouvel évènement</button>
@@ -24,8 +24,8 @@
           <input matInput formControlName="location" required />
         </mat-form-field>
         <mat-form-field appearance="outline">
-          <mat-label>Gare de référence</mat-label>
-          <input matInput formControlName="referenceStation" required />
+          <mat-label>Gares (séparées par des virgules, la première sert aux navettes)</mat-label>
+          <input matInput formControlName="stations" placeholder="Gare de Melun, Gare de Lyon" />
         </mat-form-field>
         <button mat-flat-button color="primary" type="submit">Créer</button>
       </form>
@@ -35,7 +35,12 @@
   <mat-nav-list>
     @for (event of events(); track event.id) {
       <a mat-list-item [routerLink]="eventLink(event.id)">
-        <span matListItemTitle>{{ event.name }}</span>
+        <span matListItemTitle>
+          {{ event.name }}
+          @if (!event.openToPaxs) {
+            <span class="draft-badge">pas encore ouvert</span>
+          }
+        </span>
         <span matListItemLine>
           {{ event.startDate | date: "d MMM yyyy" }} → {{ event.endDate | date: "d MMM yyyy" }} —
           {{ event.location }}
