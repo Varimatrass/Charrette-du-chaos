@@ -1,4 +1,4 @@
-import type { Event, Pax, Shuttle, Trip } from "@prisma/client";
+import type { Car, Event, Pax, Shuttle, Station, Trip } from "@prisma/client";
 import type { PrismaService } from "../../src/prisma/prisma.service.js";
 
 /**
@@ -14,7 +14,7 @@ export function factories(prisma: PrismaService) {
           startDate: new Date("2026-09-18"),
           endDate: new Date("2026-09-20"),
           location: "Ferme du Chaos",
-          referenceStation: "Gare de Testville",
+          openToPaxs: true,
           ...overrides,
         },
       }),
@@ -34,6 +34,14 @@ export function factories(prisma: PrismaService) {
           capacity: 4,
           ...overrides,
         },
+      }),
+
+    station: (eventId: string, overrides: Partial<Station> = {}) =>
+      prisma.station.create({ data: { eventId, name: "Gare de Testville", ...overrides } }),
+
+    car: (eventId: string, ownerPaxId: string, overrides: Partial<Car> = {}) =>
+      prisma.car.create({
+        data: { eventId, ownerPaxId, name: "Twingo verte", seats: 2, ...overrides },
       }),
 
     trip: (eventId: string, paxId: string, overrides: Partial<Trip> = {}) =>

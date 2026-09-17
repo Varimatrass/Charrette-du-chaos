@@ -14,8 +14,10 @@ import { UpdateEventDto } from "./dto/update-event.dto.js";
 import { EventsService } from "./events.service.js";
 
 /**
- * Les évènements n'ont rien de sensible (nom, dates, lieu) : lecture publique
- * pour que le formulaire pax puisse afficher le contexte de l'évènement.
+ * Les évènements n'ont rien de sensible (nom, dates, lieu, gares) : lecture
+ * publique pour que la page d'accueil et le formulaire pax puissent afficher
+ * le contexte. La liste publique ne montre que les évènements ouverts aux
+ * paxs ; un évènement précis reste accessible par son lien direct.
  * Écriture réservée aux organisateur·ices.
  */
 @Controller()
@@ -23,8 +25,8 @@ export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
   @Get("events")
-  findAll() {
-    return this.eventsService.findAll();
+  findOpen() {
+    return this.eventsService.findOpen();
   }
 
   @Get("events/:id")
@@ -32,9 +34,12 @@ export class EventsController {
     return this.eventsService.findOne(id);
   }
 
-  // Écriture réservée aux organisateur·ices : sous /admin/... comme les autres
-  // routes protégées par AdminGuard, pour que l'intercepteur front qui attache
-  // x-admin-key (basé sur "/admin/" dans l'URL) s'applique automatiquement.
+  @UseGuards(AdminGuard)
+  @Get("admin/events")
+  findAll() {
+    return this.eventsService.findAll();
+  }
+
   @UseGuards(AdminGuard)
   @Post("admin/events")
   create(@Body() dto: CreateEventDto) {

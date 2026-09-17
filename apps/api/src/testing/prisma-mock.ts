@@ -11,6 +11,8 @@ const DELEGATE_METHODS = [
   "delete",
   "deleteMany",
   "count",
+  "upsert",
+  "updateMany",
 ] as const;
 
 type DelegateMethod = (typeof DELEGATE_METHODS)[number];
@@ -41,6 +43,8 @@ export function createPrismaMock(): PrismaMock {
     shuttle: mockDelegate(),
     trip: mockDelegate(),
     driverAvailabilitySlot: mockDelegate(),
+    station: mockDelegate(),
+    car: mockDelegate(),
     $transaction: vi.fn(),
   };
 }

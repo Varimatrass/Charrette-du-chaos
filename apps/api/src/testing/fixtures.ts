@@ -1,4 +1,12 @@
-import type { DriverAvailabilitySlot, Event, Pax, Shuttle, Trip } from "@prisma/client";
+import type {
+  Car,
+  DriverAvailabilitySlot,
+  Event,
+  Pax,
+  Shuttle,
+  Station,
+  Trip,
+} from "@prisma/client";
 
 /**
  * Fabriques d'objets Prisma "complets" pour les tests unitaires, avec des
@@ -13,6 +21,8 @@ export const OTHER_PAX_ID = "22222222-2222-4222-8222-222222222223";
 export const SHUTTLE_ID = "33333333-3333-4333-8333-333333333333";
 export const TRIP_ID = "44444444-4444-4444-8444-444444444444";
 export const SLOT_ID = "55555555-5555-4555-8555-555555555555";
+export const STATION_ID = "66666666-6666-4666-8666-666666666666";
+export const CAR_ID = "77777777-7777-4777-8777-777777777777";
 
 export function makeEvent(overrides: Partial<Event> = {}): Event {
   return {
@@ -21,7 +31,8 @@ export function makeEvent(overrides: Partial<Event> = {}): Event {
     startDate: new Date("2026-09-18"),
     endDate: new Date("2026-09-20"),
     location: "Ferme du Chaos",
-    referenceStation: "Gare de Testville",
+    openToPaxs: true,
+    preferredStationId: STATION_ID,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
@@ -38,7 +49,6 @@ export function makePax(overrides: Partial<Pax> = {}): Pax {
     discordHandle: null,
     comment: null,
     hasVehicle: null,
-    vehicleLendingMode: null,
     hasDrivingLicense: null,
     willingToDriveShuttle: null,
     accessToken: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -55,7 +65,6 @@ export function makeShuttle(overrides: Partial<Shuttle> = {}): Shuttle {
     label: "Navette gare — matin",
     day: new Date("2026-09-18"),
     direction: "OUTBOUND",
-    driverName: "Sam",
     vehicle: "Kangoo",
     departureTime: "08:00",
     stationArrivalTime: "08:25",
@@ -78,9 +87,13 @@ export function makeTrip(overrides: Partial<Trip> = {}): Trip {
     mode: "TRAIN",
     day: new Date("2026-09-18"),
     time: "08:05",
-    station: "Gare de Testville",
+    stationId: STATION_ID,
     shuttleId: null,
     status: "PENDING",
+    origin: null,
+    carpoolRole: null,
+    carId: null,
+    lookingForCarpool: false,
     comment: null,
     createdAt: NOW,
     updatedAt: NOW,
@@ -97,6 +110,31 @@ export function makeSlot(overrides: Partial<DriverAvailabilitySlot> = {}): Drive
     startTime: null,
     endTime: null,
     comment: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function makeStation(overrides: Partial<Station> = {}): Station {
+  return {
+    id: STATION_ID,
+    eventId: EVENT_ID,
+    name: "Gare de Testville",
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function makeCar(overrides: Partial<Car> = {}): Car {
+  return {
+    id: CAR_ID,
+    eventId: EVENT_ID,
+    ownerPaxId: OTHER_PAX_ID,
+    name: "Twingo verte",
+    seats: 3,
+    lendingMode: "NOT_AVAILABLE",
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,
