@@ -41,11 +41,7 @@ describe("Pax (e2e)", () => {
         .post("/pax")
         .send({ eventId, name: "Alix", contactEmail: "not-an-email" })
         .expect(400);
-      await t
-        .http()
-        .post("/pax")
-        .send({ eventId, name: "Alix", vehicleLendingMode: "MAYBE" })
-        .expect(400);
+      await t.http().post("/pax").send({ eventId, name: "Alix", hasVehicle: "oui" }).expect(400);
       await t.http().post("/pax").send({ eventId, name: "Alix", accessToken: "hack" }).expect(400);
     });
   });
@@ -70,7 +66,10 @@ describe("Pax (e2e)", () => {
         direction: "OUTBOUND",
         status: "ASSIGNED",
         shuttle: { id: shuttle.id, label: shuttle.label },
+        station: null,
+        car: null,
       });
+      expect(body.car).toBeNull();
     });
 
     it("updates provided fields and clears the ones sent as null", async () => {
@@ -112,13 +111,20 @@ describe("Pax (e2e)", () => {
         .expect(400);
     });
 
-    it("GET /pax/me/paxs lists the other paxs without any contact details", async () => {
+    it("GET /pax/me/paxs lists the other paxs with a trip summary and no contact details", async () => {
       const me = await make.pax(eventId, { name: "Moi" });
-      await make.pax(eventId, {
+      const bilal = await make.pax(eventId, {
         name: "Bilal",
         contactEmail: "b@example.com",
         contactPhone: "0601",
-        discordHandle: "bilal",
+        discordHandle: "bilal#1",
+        comment: "secret",
+      });
+      await make.trip(eventId, bilal.id, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        lookingForCarpool: true,
+        comment: "interne",
       });
       const otherEvent = await make.event({ name: "Autre" });
       await make.pax(otherEvent.id, { name: "Pas mon évènement" });
@@ -126,17 +132,23 @@ describe("Pax (e2e)", () => {
       const { body } = await t.http().get("/pax/me/paxs").set(t.asPax(me.accessToken)).expect(200);
 
       expect(body.map((p: { name: string }) => p.name)).toEqual(["Bilal", "Moi"]);
-      const bilal = body.find((p: { name: string }) => p.name === "Bilal");
-      expect(bilal).toEqual({
-        id: expect.any(String),
+      const bilalOverview = body.find((p: { name: string }) => p.name === "Bilal");
+      expect(bilalOverview).toEqual({
+        id: bilal.id,
         name: "Bilal",
-        discordHandle: "bilal",
-        comment: null,
-        hasVehicle: null,
-        vehicleLendingMode: null,
-        hasDrivingLicense: null,
-        willingToDriveShuttle: null,
+        trips: [
+          {
+            direction: "OUTBOUND",
+            mode: "CARPOOL",
+            status: "PENDING",
+            shuttleId: null,
+            carpoolRole: "PASSENGER",
+            carId: null,
+            lookingForCarpool: true,
+          },
+        ],
       });
+      expect(JSON.stringify(body)).not.toMatch(/b@example.com|0601|bilal#|secret|interne/);
     });
   });
 

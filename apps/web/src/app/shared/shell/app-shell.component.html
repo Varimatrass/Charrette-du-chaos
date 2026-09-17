@@ -1,0 +1,53 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav
+    class="sidenav"
+    [mode]="isHandset() ? 'over' : 'side'"
+    [opened]="isHandset() ? opened() : true"
+    [fixedInViewport]="isHandset()"
+  >
+    <div class="brand">
+      <mat-icon>airport_shuttle</mat-icon>
+      <div>
+        <div class="brand-title">{{ title() }}</div>
+        @if (subtitle()) {
+          <div class="brand-subtitle">{{ subtitle() }}</div>
+        }
+      </div>
+    </div>
+
+    <mat-nav-list>
+      @if (backLink(); as back) {
+        <a mat-list-item [routerLink]="back.link" (click)="onNavigate()" class="back">
+          <mat-icon matListItemIcon>{{ back.icon }}</mat-icon>
+          <span matListItemTitle>{{ back.label }}</span>
+        </a>
+      }
+      @for (item of links(); track item.label) {
+        <a
+          mat-list-item
+          [routerLink]="item.link"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+          (click)="onNavigate()"
+        >
+          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+          <span matListItemTitle>{{ item.label }}</span>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    @if (isHandset()) {
+      <mat-toolbar class="mobile-bar">
+        <button mat-icon-button type="button" aria-label="Menu" (click)="toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <span>{{ title() }}</span>
+      </mat-toolbar>
+    }
+    <main class="content">
+      <router-outlet></router-outlet>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

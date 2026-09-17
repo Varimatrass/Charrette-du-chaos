@@ -14,12 +14,13 @@ import { Direction } from "@desordre/shared-types";
 import { AdminGuard } from "../common/guards/admin.guard.js";
 import { CurrentPax } from "../common/decorators/current-pax.decorator.js";
 import { PaxTokenGuard } from "../common/guards/pax-token.guard.js";
+import { ParseEnumValuePipe } from "../common/pipes/parse-enum-value.pipe.js";
 import { AssignTripDto } from "./dto/assign-trip.dto.js";
 import { ListTripsQueryDto } from "./dto/list-trips-query.dto.js";
+import { SetMyShuttleDto } from "./dto/set-my-shuttle.dto.js";
 import { SetTripStatusDto } from "./dto/set-trip-status.dto.js";
 import { UpsertTripDto } from "./dto/upsert-trip.dto.js";
 import { TripsService } from "./trips.service.js";
-import { ParseEnumValuePipe } from "../common/pipes/parse-enum-value.pipe.js";
 
 @Controller()
 export class TripsController {
@@ -35,10 +36,21 @@ export class TripsController {
     return this.tripsService.upsertMine(pax, direction, dto);
   }
 
+  /** Un pax se met lui/elle-même dans une navette non pleine (ou s'en retire). */
+  @UseGuards(PaxTokenGuard)
+  @Patch("pax/me/trips/:direction/shuttle")
+  setMyShuttle(
+    @CurrentPax() pax: Pax,
+    @Param("direction", new ParseEnumValuePipe(Direction)) direction: Direction,
+    @Body() dto: SetMyShuttleDto,
+  ) {
+    return this.tripsService.setMyShuttle(pax, direction, dto);
+  }
+
   @UseGuards(AdminGuard)
   @Get("admin/trips")
   findAllForEvent(@Query() query: ListTripsQueryDto) {
-    return this.tripsService.findAllForEvent(query.eventId, query.status);
+    return this.tripsService.findAllForEvent(query.eventId, query.status, query.direction);
   }
 
   @UseGuards(AdminGuard)

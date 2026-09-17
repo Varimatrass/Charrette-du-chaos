@@ -26,7 +26,7 @@ describe("ShuttlesService", () => {
   beforeEach(() => vi.clearAllMocks());
 
   describe("create", () => {
-    it("converts the day and treats an empty driverPaxId as 'no link'", async () => {
+    it("converts the day and treats an empty driverPaxId as 'no driver yet'", async () => {
       prisma.shuttle.create.mockResolvedValue(makeShuttle());
       await service.create({
         eventId: EVENT_ID,
@@ -63,7 +63,7 @@ describe("ShuttlesService", () => {
     const shuttleWithPassengers = {
       ...makeShuttle({ driverPaxId: OTHER_PAX_ID }),
       trips: [{ pax: { id: PAX_ID, name: "Alix" } }, { pax: { id: OTHER_PAX_ID, name: "Bilal" } }],
-      driverPax: { contactPhone: "0600000009" },
+      driverPax: { id: OTHER_PAX_ID, name: "Bilal", contactPhone: "0600000009" },
     };
 
     it("lists passenger names only, never their contact details", async () => {
@@ -75,7 +75,8 @@ describe("ShuttlesService", () => {
       ]);
       expect(shuttle?.remainingSeats).toBe(2);
       expect(shuttle).not.toHaveProperty("trips");
-      expect(shuttle).not.toHaveProperty("driverPax");
+      expect(shuttle?.driverPax).toEqual({ id: OTHER_PAX_ID, name: "Bilal" });
+      expect(JSON.stringify(shuttle)).not.toContain("0600000009");
     });
 
     it("shows the driver's phone only to the passengers of that shuttle", async () => {
@@ -114,8 +115,9 @@ describe("ShuttlesService", () => {
 
   describe("update", () => {
     beforeEach(() => {
-      prisma.shuttle.findUnique.mockResolvedValue({ id: SHUTTLE_ID });
+      prisma.shuttle.findUnique.mockResolvedValue({ id: SHUTTLE_ID, eventId: EVENT_ID });
       prisma.shuttle.update.mockResolvedValue(makeShuttle());
+      prisma.pax.findUnique.mockResolvedValue({ eventId: EVENT_ID });
     });
 
     it("only touches provided fields and clears the ones sent as null", async () => {

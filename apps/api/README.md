@@ -21,7 +21,7 @@ src/
     dto/                   # DTO de query string communs (eventId)
     utils/                 # wait-level (attente en gare), dates, objects (omitUndefined...)
   prisma/                  # PrismaService (connexion avec tentatives au démarrage)
-  events/ pax/ trips/ shuttles/ driver-availability/
+  events/ stations/ pax/ cars/ trips/ shuttles/ driver-availability/
                            # un module Nest par ressource : controller + service + dto/
   testing/                 # mock de PrismaService et fixtures pour les tests unitaires
 test/
@@ -41,10 +41,16 @@ prisma/
 - **Vocabulaire :** `pax` (participant·e, gardé tel quel), `shuttle`
   (navette), `trip` (trajet aller ou retour d'un pax), `direction`
   (`OUTBOUND` = aller vers le lieu, `RETURN` = retour vers la gare),
-  `wait level` (indicateur d'attente en gare).
-- **Routes :** `/events` (lecture publique), `/pax` (inscription publique),
-  `/pax/me/...` (auto-service avec `x-pax-token`), `/admin/...` (back-office
-  avec `x-admin-key`).
+  `station` (gare d'un évènement, `preferredStationId` = celle desservie par
+  les navettes), `car` (la voiture d'un pax, une par pax et par évènement,
+  avec son mode de prêt), `carpool role` (`DRIVER`/`PASSENGER` sur un
+  trajet en covoiturage), `wait level` (indicateur d'attente en gare).
+- **Routes :** `/events` (lecture publique : seulement les évènements
+  `openToPaxs`, sauf `/events/:id` qui marche toujours), `/pax` (inscription
+  publique), `/pax/me/...` (auto-service avec `x-pax-token` : infos, voiture,
+  trajets, gares, auto-placement dans une navette via
+  `PATCH /pax/me/trips/:direction/shuttle`), `/admin/...` (back-office avec
+  `x-admin-key`).
 - **Mises à jour partielles :** un champ absent du body n'est pas touché, un
   champ envoyé à `null` est effacé. Les DTO `Update*` dérivent des `Create*`
   avec `PartialType`/`OmitType`.

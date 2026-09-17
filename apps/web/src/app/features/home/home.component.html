@@ -1,0 +1,49 @@
+<div class="page-centered">
+  <div class="home">
+    <header class="hero">
+      <mat-icon class="hero-icon">airport_shuttle</mat-icon>
+      <h1>Charrette du Chaos</h1>
+      <p class="subtitle">Navettes et covoiturage des évènements en autogestion.</p>
+    </header>
+
+    <mat-card class="card">
+      <h2>J'ai déjà un code</h2>
+      <p class="hint">Colle ton lien personnel, ou juste le code qu'il contient.</p>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Ton lien ou ton code personnel</mat-label>
+        <input matInput [formControl]="tokenControl" (keyup.enter)="login()" />
+        @if (tokenControl.invalid && tokenControl.touched) {
+          <mat-error>Il faut renseigner ton lien ou ton code.</mat-error>
+        }
+      </mat-form-field>
+      <button mat-flat-button color="primary" type="button" (click)="login()">Continuer</button>
+    </mat-card>
+
+    <mat-card class="card">
+      <h2>Je m'inscris à un évènement</h2>
+      @if (openEvents().length === 0) {
+        <p class="hint">
+          Aucun évènement n'est ouvert aux inscriptions pour l'instant. Si l'orga t'a envoyé un lien
+          direct, utilise-le.
+        </p>
+      } @else {
+        <div class="events">
+          @for (event of openEvents(); track event.id) {
+            <a mat-stroked-button [routerLink]="registrationLink(event.id)" class="event-link">
+              <span class="event-name">{{ event.name }}</span>
+              <span class="event-dates">
+                {{ event.startDate | date: "d MMM" }} → {{ event.endDate | date: "d MMM yyyy" }} —
+                {{ event.location }}
+              </span>
+            </a>
+          }
+        </div>
+      }
+    </mat-card>
+
+    <a mat-button [routerLink]="adminLink" class="admin-link">
+      <mat-icon>admin_panel_settings</mat-icon>
+      Espace organisateur·ice
+    </a>
+  </div>
+</div>

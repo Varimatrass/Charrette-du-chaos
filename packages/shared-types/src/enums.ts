@@ -55,6 +55,16 @@ export const WaitLevel = {
 export type WaitLevel = (typeof WaitLevel)[keyof typeof WaitLevel];
 
 /**
+ * Rôle d'un pax dans un covoiturage pour un trajet donné : conduit sa propre
+ * voiture, ou est passager·e (d'une voiture identifiée, ou pas encore).
+ */
+export const CarpoolRole = {
+  DRIVER: "DRIVER",
+  PASSENGER: "PASSENGER",
+} as const;
+export type CarpoolRole = (typeof CarpoolRole)[keyof typeof CarpoolRole];
+
+/**
  * Nuance du prêt de véhicule pour les navettes : certain·es pax acceptent de
  * prêter leur véhicule uniquement si c'est elleux qui le conduisent (question
  * d'assurance), d'autres l'acceptent même si quelqu'un d'autre conduit.

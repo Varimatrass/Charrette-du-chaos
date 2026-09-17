@@ -7,7 +7,7 @@ import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatListModule } from "@angular/material/list";
-import type { Event } from "@desordre/shared-types";
+import type { EventWithStations } from "@desordre/shared-types";
 import { EventsApiService } from "../../../core/api/events-api.service";
 import { appLinks } from "../../../core/app-paths";
 
@@ -30,7 +30,7 @@ import { appLinks } from "../../../core/app-paths";
 export class AdminEventsComponent {
   private readonly eventsApi = inject(EventsApiService);
 
-  readonly events = signal<Event[]>([]);
+  readonly events = signal<EventWithStations[]>([]);
   readonly showForm = signal(false);
   readonly eventLink = appLinks.adminEvent;
 
@@ -39,7 +39,8 @@ export class AdminEventsComponent {
     startDate: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     endDate: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     location: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    referenceStation: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    /** Gares séparées par des virgules ; la première devient la gare préférée. */
+    stations: new FormControl("", { nonNullable: true }),
   });
 
   constructor() {
@@ -47,7 +48,7 @@ export class AdminEventsComponent {
   }
 
   private load(): void {
-    this.eventsApi.list().subscribe((events) => this.events.set(events));
+    this.eventsApi.listAll().subscribe((events) => this.events.set(events));
   }
 
   toggleForm(): void {
@@ -59,7 +60,12 @@ export class AdminEventsComponent {
       this.form.markAllAsTouched();
       return;
     }
-    this.eventsApi.create(this.form.getRawValue()).subscribe(() => {
+    const { stations, ...details } = this.form.getRawValue();
+    const stationNames = stations
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    this.eventsApi.create({ ...details, stations: stationNames }).subscribe(() => {
       this.form.reset();
       this.showForm.set(false);
       this.load();

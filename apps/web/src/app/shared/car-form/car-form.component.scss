@@ -1,0 +1,20 @@
+.car-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.question {
+  margin: 0.5rem 0 0;
+  font-weight: 500;
+}
+
+mat-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

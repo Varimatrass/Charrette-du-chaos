@@ -1,4 +1,4 @@
-import { Direction, TransportMode, TripStatus, VehicleLendingMode } from "./enums";
+import { CarpoolRole, Direction, TransportMode, TripStatus, VehicleLendingMode } from "./enums";
 
 /** Tous les champs facultatifs, et effaçables avec `null`. */
 export type Nullable<T> = { [K in keyof T]?: T[K] | null };
@@ -10,10 +10,25 @@ export interface CreateEventInput {
   startDate: string;
   endDate: string;
   location: string;
-  referenceStation: string;
+  /** Gares à créer avec l'évènement ; la première devient la gare préférée. */
+  stations?: string[];
 }
 
-export type UpdateEventInput = Partial<CreateEventInput>;
+export interface UpdateEventInput {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  openToPaxs?: boolean;
+  /** `null` pour ne plus avoir de gare préférée. */
+  preferredStationId?: string | null;
+}
+
+// ---- Gares ----
+
+export interface CreateStationInput {
+  name: string;
+}
 
 // ---- Pax (auto-inscription, sans compte) ----
 
@@ -29,7 +44,6 @@ export interface CreatePaxInput {
   discordHandle?: string;
   comment?: string;
   hasVehicle?: boolean;
-  vehicleLendingMode?: VehicleLendingMode;
   hasDrivingLicense?: boolean;
   willingToDriveShuttle?: boolean;
 }
@@ -48,23 +62,47 @@ export interface PaxSubmissionResult {
   personalLink: string;
 }
 
+// ---- Voiture ----
+
+/** Création ou mise à jour de SA voiture (une seule par pax). */
+export interface UpsertCarInput {
+  name: string;
+  seats: number;
+  lendingMode: VehicleLendingMode;
+}
+
 // ---- Trajet ----
 
 /**
  * Corps de PUT /pax/me/trips/:direction — la direction vient de l'URL, pas
  * du body. Tous les champs sont facultatifs : "pas encore décidé" est un
  * état valide à l'inscription, à compléter plus tard.
+ *
+ * Train : `stationId` (gare existante) OU `stationName` (nouvelle gare,
+ * créée à la volée pour l'évènement). Covoiturage : `origin`, `carpoolRole`,
+ * puis `carId` (voiture où iel a une place, si PASSENGER) ou
+ * `lookingForCarpool` (cherche encore).
  */
 export interface UpsertTripInput {
   mode?: TransportMode;
   day?: string;
   time?: string;
-  station?: string;
+  stationId?: string;
+  stationName?: string;
   comment?: string;
+  origin?: string;
+  carpoolRole?: CarpoolRole;
+  carId?: string;
+  lookingForCarpool?: boolean;
 }
 
 /** Action réservée au back-office organisateur·ice. */
 export interface AssignTripInput {
+  shuttleId: string | null;
+}
+
+/** Un pax se met (ou se retire) lui/elle-même dans une navette non pleine. */
+export interface SetMyShuttleInput {
   shuttleId: string | null;
 }
 
@@ -79,7 +117,6 @@ export interface CreateShuttleInput {
   label: string;
   day: string;
   direction: Direction;
-  driverName?: string;
   vehicle?: string;
   departureTime: string;
   stationArrivalTime: string;
@@ -96,12 +133,7 @@ export type UpdateShuttleInput = Partial<
     "label" | "day" | "direction" | "departureTime" | "stationArrivalTime" | "capacity"
   >
 > &
-  Nullable<
-    Pick<
-      CreateShuttleInput,
-      "driverName" | "vehicle" | "venueReturnTime" | "comment" | "driverPaxId"
-    >
-  >;
+  Nullable<Pick<CreateShuttleInput, "vehicle" | "venueReturnTime" | "comment" | "driverPaxId">>;
 
 // ---- Recherche / lookup admin ----
 

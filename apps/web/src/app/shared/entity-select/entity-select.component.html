@@ -1,0 +1,51 @@
+<mat-form-field appearance="outline" class="entity-select" subscriptSizing="dynamic">
+  @if (label()) {
+    <mat-label>{{ label() }}</mat-label>
+  }
+  <input
+    matInput
+    [formControl]="searchControl"
+    [placeholder]="placeholder()"
+    [matAutocomplete]="auto"
+    [required]="required()"
+    (input)="onInput()"
+    (focus)="onFocus()"
+    (blur)="onBlur()"
+  />
+  @if (value() && !disabled()) {
+    <button matSuffix mat-icon-button type="button" aria-label="Effacer" (click)="clear()">
+      <mat-icon>close</mat-icon>
+    </button>
+  } @else {
+    <mat-icon matSuffix>arrow_drop_down</mat-icon>
+  }
+  @if (hint()) {
+    <mat-hint>{{ hint() }}</mat-hint>
+  }
+  <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onSelected($event)">
+    @if (emptyLabel() !== null) {
+      <mat-option [value]="null">{{ emptyLabel() }}</mat-option>
+    }
+    @for (option of filtered(); track option.id) {
+      <mat-option [value]="option.id" [disabled]="option.disabled ?? false">
+        <span>{{ option.label }}</span>
+        @if (option.hint) {
+          <span class="option-hint">{{ option.hint }}</span>
+        }
+      </mat-option>
+    }
+    @if (canCreate()) {
+      <mat-option
+        (onSelectionChange)="$event.isUserInput && requestCreate()"
+        [value]="value()"
+        class="create-option"
+      >
+        <mat-icon>add</mat-icon>
+        {{ createLabel() }} « {{ searchControl.value.trim() }} »
+      </mat-option>
+    }
+    @if (filtered().length === 0 && !canCreate()) {
+      <mat-option disabled [value]="value()">Aucun résultat</mat-option>
+    }
+  </mat-autocomplete>
+</mat-form-field>

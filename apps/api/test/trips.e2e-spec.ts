@@ -7,6 +7,7 @@ describe("Trips (e2e)", () => {
   let eventId: string;
   let token: string;
   let paxId: string;
+  let stationId: string;
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -15,6 +16,7 @@ describe("Trips (e2e)", () => {
   beforeEach(async () => {
     await t.resetDatabase();
     eventId = (await make.event()).id;
+    stationId = (await make.station(eventId)).id;
     const pax = await make.pax(eventId);
     token = pax.accessToken;
     paxId = pax.id;
@@ -27,7 +29,7 @@ describe("Trips (e2e)", () => {
         .http()
         .put("/pax/me/trips/OUTBOUND")
         .set(t.asPax(token))
-        .send({ mode: "TRAIN", day: "2026-09-18", time: "08:05", station: "Gare" })
+        .send({ mode: "TRAIN", day: "2026-09-18", time: "08:05", stationId })
         .expect(200);
       expect(first.body).toMatchObject({
         direction: "OUTBOUND",
@@ -35,6 +37,7 @@ describe("Trips (e2e)", () => {
         time: "08:05",
         paxId,
         eventId,
+        stationId,
       });
 
       const second = await t
@@ -45,7 +48,7 @@ describe("Trips (e2e)", () => {
         .expect(200);
       expect(second.body.id).toBe(first.body.id);
       // Les champs non renvoyés repassent explicitement à null ("pas encore décidé").
-      expect(second.body).toMatchObject({ time: "09:05", day: null, station: null });
+      expect(second.body).toMatchObject({ time: "09:05", day: null, stationId: null });
       expect(await t.prisma.trip.count()).toBe(1);
     });
 
@@ -91,6 +94,220 @@ describe("Trips (e2e)", () => {
     it("requires a pax token", async () => {
       await t.http().put("/pax/me/trips/OUTBOUND").send({}).expect(401);
     });
+
+    it("creates a new station on the fly when the pax types one", async () => {
+      const { body } = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "TRAIN", stationName: "  Gare  Neuve " })
+        .expect(200);
+      const stations = await t.prisma.station.findMany({
+        where: { eventId },
+        orderBy: { name: "asc" },
+      });
+      expect(stations.map((s) => s.name)).toEqual(["Gare Neuve", "Gare de Testville"]);
+      expect(body.stationId).toBe(stations[0]?.id);
+
+      // Le même nom retapé réutilise la gare au lieu d'en créer une deuxième.
+      await t
+        .http()
+        .put("/pax/me/trips/RETURN")
+        .set(t.asPax(token))
+        .send({ mode: "TRAIN", stationName: "Gare Neuve" })
+        .expect(200);
+      expect(await t.prisma.station.count({ where: { eventId } })).toBe(2);
+    });
+
+    it("refuses a station from another event", async () => {
+      const other = await make.event({ name: "Autre" });
+      const foreign = await make.station(other.id, { name: "Ailleurs" });
+      await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "TRAIN", stationId: foreign.id })
+        .expect(400);
+    });
+  });
+
+  describe("carpool", () => {
+    it("a driver needs a declared car, then is linked to it", async () => {
+      await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", carpoolRole: "DRIVER", origin: "Melun" })
+        .expect(400);
+
+      const car = await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(token))
+        .send({ name: "Twingo verte", seats: 2, lendingMode: "ONLY_IF_OWNER_DRIVES" })
+        .expect(200);
+      expect(car.body).toMatchObject({
+        name: "Twingo verte",
+        seats: 2,
+        ownerPaxId: paxId,
+        eventId,
+      });
+
+      const { body } = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", carpoolRole: "DRIVER", origin: "Melun" })
+        .expect(200);
+      expect(body).toMatchObject({
+        carpoolRole: "DRIVER",
+        carId: car.body.id,
+        origin: "Melun",
+        lookingForCarpool: false,
+      });
+    });
+
+    it("a passenger picks a car with a free seat, or is looking for one", async () => {
+      const driver = await make.pax(eventId, { name: "Bilal" });
+      const car = await make.car(eventId, driver.id, { seats: 1 });
+
+      const looking = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", carpoolRole: "PASSENGER", origin: "Paris" })
+        .expect(200);
+      expect(looking.body).toMatchObject({
+        carpoolRole: "PASSENGER",
+        carId: null,
+        lookingForCarpool: true,
+      });
+
+      const seated = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", carpoolRole: "PASSENGER", carId: car.id })
+        .expect(200);
+      expect(seated.body).toMatchObject({ carId: car.id, lookingForCarpool: false });
+
+      // La voiture (1 place) est maintenant pleine à l'aller pour quelqu'un d'autre...
+      const other = await make.pax(eventId, { name: "Camille" });
+      await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(other.accessToken))
+        .send({ mode: "CARPOOL", carpoolRole: "PASSENGER", carId: car.id })
+        .expect(400);
+      // ...mais pas au retour.
+      await t
+        .http()
+        .put("/pax/me/trips/RETURN")
+        .set(t.asPax(other.accessToken))
+        .send({ mode: "CARPOOL", carpoolRole: "PASSENGER", carId: car.id })
+        .expect(200);
+
+      const cars = await t.http().get("/pax/me/cars").set(t.asPax(token)).expect(200);
+      expect(cars.body).toHaveLength(1);
+      expect(cars.body[0]).toMatchObject({
+        id: car.id,
+        owner: { id: driver.id, name: "Bilal" },
+        remainingSeats: { OUTBOUND: 0, RETURN: 0 },
+      });
+      expect(cars.body[0].passengers.OUTBOUND).toEqual([{ paxId, name: "Alix Moreau" }]);
+    });
+
+    it("deleting one's car sends its passengers back to 'looking for a carpool'", async () => {
+      await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(token))
+        .send({ name: "Twingo", seats: 3, lendingMode: "NOT_AVAILABLE" })
+        .expect(200);
+      const myCar = await t.prisma.car.findUniqueOrThrow({ where: { ownerPaxId: paxId } });
+      const passenger = await make.pax(eventId, { name: "Camille" });
+      await make.trip(eventId, passenger.id, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: myCar.id,
+      });
+
+      await t.http().delete("/pax/me/car").set(t.asPax(token)).expect(204);
+      await t.http().delete("/pax/me/car").set(t.asPax(token)).expect(404);
+
+      const trip = await t.prisma.trip.findFirstOrThrow({ where: { paxId: passenger.id } });
+      expect(trip).toMatchObject({
+        carId: null,
+        lookingForCarpool: true,
+        carpoolRole: "PASSENGER",
+      });
+    });
+  });
+
+  describe("PATCH /pax/me/trips/:direction/shuttle (self-assignment)", () => {
+    it("lets a pax join a shuttle with a free seat, and leave it", async () => {
+      const shuttle = await make.shuttle(eventId, { capacity: 1 });
+      await make.trip(eventId, paxId);
+
+      const joined = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(200);
+      expect(joined.body).toMatchObject({ shuttleId: shuttle.id, status: "ASSIGNED" });
+
+      // Pleine pour les autres, pas pour celui qui y est déjà.
+      const other = await make.pax(eventId, { name: "Camille" });
+      await make.trip(eventId, other.id);
+      await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(other.accessToken))
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+      await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(200);
+
+      const left = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: null })
+        .expect(200);
+      expect(left.body).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("refuses the wrong direction, another event's shuttle, and a trip not yet filled in", async () => {
+      const returnShuttle = await make.shuttle(eventId, { direction: "RETURN" });
+      await make.trip(eventId, paxId);
+      await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: returnShuttle.id })
+        .expect(400);
+
+      const other = await make.event({ name: "Autre" });
+      const foreign = await make.shuttle(other.id);
+      await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: foreign.id })
+        .expect(400);
+
+      await t
+        .http()
+        .patch("/pax/me/trips/RETURN/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: returnShuttle.id })
+        .expect(404);
+    });
   });
 
   describe("GET /pax/me/trips (overview for other paxs)", () => {
@@ -102,6 +319,7 @@ describe("Trips (e2e)", () => {
         shuttleId: shuttle.id,
         status: "ASSIGNED",
         comment: "secret",
+        stationId,
       });
 
       const { body } = await t.http().get("/pax/me/trips").set(t.asPax(token)).expect(200);
@@ -111,6 +329,8 @@ describe("Trips (e2e)", () => {
         paxName: "Bilal",
         shuttleId: shuttle.id,
         shuttleLabel: "Matin",
+        stationId,
+        stationName: "Gare de Testville",
         status: "ASSIGNED",
         waitLevel: "MEDIUM",
       });
@@ -133,8 +353,17 @@ describe("Trips (e2e)", () => {
       expect(assigned).toMatchObject({
         waitLevel: "HIGH",
         pax: { id: paxId, name: "Alix Moreau" },
+        station: null,
       });
       expect(assigned).not.toHaveProperty("shuttle");
+
+      const outbound = await t
+        .http()
+        .get("/admin/trips")
+        .set(t.asAdmin)
+        .query({ eventId, direction: "OUTBOUND" })
+        .expect(200);
+      expect(outbound.body).toHaveLength(1);
 
       const pending = await t
         .http()

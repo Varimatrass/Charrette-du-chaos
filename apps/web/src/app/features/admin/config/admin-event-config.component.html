@@ -1,0 +1,101 @@
+<h1>Configuration</h1>
+
+@if (event(); as e) {
+  <div class="config">
+    <mat-card class="card">
+      <h2>Ouverture aux paxs</h2>
+      <p class="hint">
+        Tant que l'évènement n'est pas ouvert, il n'apparaît pas sur la page d'accueil. Le lien
+        direct ci-dessous fonctionne dans tous les cas (pratique pour tester).
+      </p>
+      <mat-slide-toggle [checked]="e.openToPaxs" (change)="setOpenToPaxs($event.checked)">
+        {{ e.openToPaxs ? "Ouvert aux inscriptions" : "Pas encore ouvert" }}
+      </mat-slide-toggle>
+      <div class="link-row">
+        <code>{{ publicLink }}</code>
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Copier le lien"
+          (click)="copyPublicLink()"
+        >
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+
+    <mat-card class="card">
+      <h2>Infos de l'évènement</h2>
+      <form [formGroup]="form" (ngSubmit)="saveDetails()" class="stacked-form">
+        <mat-form-field appearance="outline">
+          <mat-label>Nom</mat-label>
+          <input matInput formControlName="name" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Date de début</mat-label>
+          <input matInput type="date" formControlName="startDate" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Date de fin</mat-label>
+          <input matInput type="date" formControlName="endDate" required />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Lieu</mat-label>
+          <input matInput formControlName="location" required />
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          Enregistrer
+        </button>
+      </form>
+    </mat-card>
+
+    <mat-card class="card">
+      <h2>Gares</h2>
+      <p class="hint">
+        Les gares proposées aux paxs à l'inscription. La gare préférée est celle desservie par les
+        navettes.
+      </p>
+      @if (e.stations.length === 0) {
+        <p>Aucune gare pour l'instant.</p>
+      } @else {
+        <mat-radio-group
+          class="stations"
+          [value]="e.preferredStationId"
+          (change)="setPreferredStation($event.value)"
+        >
+          @for (station of e.stations; track station.id) {
+            <div class="station-row">
+              <mat-radio-button [value]="station.id">{{ station.name }}</mat-radio-button>
+              @if (station.id === e.preferredStationId) {
+                <span class="preferred-badge">navettes</span>
+              }
+              <span class="spacer"></span>
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Supprimer"
+                (click)="removeStation(station.id)"
+              >
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+          }
+        </mat-radio-group>
+      }
+      <div class="add-station">
+        <mat-form-field appearance="outline">
+          <mat-label>Ajouter une gare</mat-label>
+          <input matInput [formControl]="newStationControl" (keydown.enter)="addStation()" />
+        </mat-form-field>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="!newStationControl.value.trim()"
+          (click)="addStation()"
+        >
+          Ajouter
+        </button>
+      </div>
+    </mat-card>
+  </div>
+}

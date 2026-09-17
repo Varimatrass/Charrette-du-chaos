@@ -1,13 +1,4 @@
-import {
-  IsBoolean,
-  IsEmail,
-  IsIn,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUUID,
-} from "class-validator";
-import { VehicleLendingMode } from "@desordre/shared-types";
+import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 import type { CreatePaxInput } from "@desordre/shared-types";
 
 export class CreatePaxDto implements CreatePaxInput {
@@ -37,10 +28,6 @@ export class CreatePaxDto implements CreatePaxInput {
   @IsOptional()
   @IsBoolean()
   hasVehicle?: boolean;
-
-  @IsOptional()
-  @IsIn(Object.values(VehicleLendingMode))
-  vehicleLendingMode?: VehicleLendingMode;
 
   @IsOptional()
   @IsBoolean()

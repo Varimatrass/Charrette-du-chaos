@@ -11,16 +11,26 @@ import { UpdatePaxDto } from "./dto/update-pax.dto.js";
 /** Vue d'un pax sans son jeton d'accès (tout ce qui n'est pas back-office). */
 export type PublicPax = Omit<Pax, "accessToken">;
 
-/** Champs exposés aux autres paxs de l'évènement : jamais de coordonnées ni de jeton. */
+/**
+ * Champs exposés aux autres paxs de l'évènement : le nom et comment iel
+ * vient (résumé de ses trajets) — jamais de coordonnées, de commentaire ni
+ * de jeton. Sélection explicite pour qu'un futur champ sensible ne fuite
+ * pas ici par défaut.
+ */
 const PAX_OVERVIEW_SELECT = {
   id: true,
   name: true,
-  discordHandle: true,
-  comment: true,
-  hasVehicle: true,
-  vehicleLendingMode: true,
-  hasDrivingLicense: true,
-  willingToDriveShuttle: true,
+  trips: {
+    select: {
+      direction: true,
+      mode: true,
+      status: true,
+      shuttleId: true,
+      carpoolRole: true,
+      carId: true,
+      lookingForCarpool: true,
+    },
+  },
 } as const;
 
 /** Retire le jeton d'accès d'un pax avant de le renvoyer. */
@@ -52,15 +62,19 @@ export class PaxService {
   async findMine(pax: Pax) {
     const withTrips = await this.prisma.pax.findUnique({
       where: { id: pax.id },
-      include: { trips: { include: { shuttle: true } } },
+      include: { car: true, trips: { include: { shuttle: true, station: true, car: true } } },
     });
     if (!withTrips) throw new NotFoundException("Pax introuvable");
     return toPublicPax(withTrips);
   }
 
-  /** Back-office : inclut le jeton, pour renvoyer un lien perdu. */
-  findAllForEvent(eventId: string): Promise<Pax[]> {
-    return this.prisma.pax.findMany({ where: { eventId }, orderBy: { name: "asc" } });
+  /** Back-office : inclut le jeton (pour renvoyer un lien perdu), la voiture et les trajets. */
+  findAllForEvent(eventId: string) {
+    return this.prisma.pax.findMany({
+      where: { eventId },
+      include: { car: true, trips: { include: { shuttle: true, station: true, car: true } } },
+      orderBy: { name: "asc" },
+    });
   }
 
   /** Back-office : recherche insensible à la casse sur une partie du nom. */
@@ -77,13 +91,7 @@ export class PaxService {
     return pax;
   }
 
-  /**
-   * Vue "annuaire" des paxs de l'évènement, telle que vue par les autres
-   * paxs : jamais l'email, le téléphone ou le jeton d'accès de qui que ce
-   * soit — juste de quoi se coordonner (nom, discord, véhicule/permis/conduite).
-   * Champs sélectionnés explicitement plutôt que filtrés après coup, pour
-   * qu'un futur champ sensible ajouté à Pax ne fuite pas ici par défaut.
-   */
+  /** Vue "annuaire" des paxs de l'évènement, telle que vue par les autres paxs (voir PAX_OVERVIEW_SELECT). */
   findAllForEventOverview(eventId: string): Promise<PaxOverview[]> {
     return this.prisma.pax.findMany({
       where: { eventId },

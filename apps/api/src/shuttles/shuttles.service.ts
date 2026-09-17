@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Shuttle } from "@prisma/client";
 import { toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
@@ -10,6 +10,9 @@ import { UpdateShuttleDto } from "./dto/update-shuttle.dto.js";
 /** Tri chronologique commun à toutes les listes de navettes. */
 const SHUTTLES_ORDER = [{ day: "asc" }, { departureTime: "asc" }] as const;
 
+/** Ce qu'on expose du/de la conducteur·ice dans les listes : juste de quoi l'identifier. */
+const DRIVER_SELECT = { select: { id: true, name: true } } as const;
+
 /** Places restantes = capacité − nombre de trajets assignés (jamais négatif à l'affichage). */
 export function remainingSeats(capacity: number, assignedTrips: number): number {
   return capacity - assignedTrips;
@@ -19,17 +22,19 @@ export function remainingSeats(capacity: number, assignedTrips: number): number 
 export class ShuttlesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateShuttleDto): Promise<Shuttle> {
+  async create(dto: CreateShuttleDto): Promise<Shuttle> {
+    const driverPaxId = dto.driverPaxId || null;
+    if (driverPaxId) await this.ensureDriverInEvent(dto.eventId, driverPaxId);
     return this.prisma.shuttle.create({
-      data: { ...dto, day: toDate(dto.day), driverPaxId: dto.driverPaxId || null },
+      data: { ...dto, day: toDate(dto.day), driverPaxId },
     });
   }
 
-  /** Back-office : navettes d'un évènement avec leurs places restantes. */
+  /** Navettes d'un évènement avec leurs places restantes et leur conducteur·ice (nom). */
   async findAllForEvent(eventId: string) {
     const shuttles = await this.prisma.shuttle.findMany({
       where: { eventId },
-      include: { _count: { select: { trips: true } } },
+      include: { _count: { select: { trips: true } }, driverPax: DRIVER_SELECT },
       orderBy: [...SHUTTLES_ORDER],
     });
 
@@ -37,6 +42,17 @@ export class ShuttlesService {
       ...shuttle,
       remainingSeats: remainingSeats(shuttle.capacity, _count.trips),
     }));
+  }
+
+  /** Une navette avec ses places restantes, ou `null` — pour les contrôles d'assignation. */
+  async findOneWithSeats(id: string) {
+    const shuttle = await this.prisma.shuttle.findUnique({
+      where: { id },
+      include: { _count: { select: { trips: true } } },
+    });
+    if (!shuttle) return null;
+    const { _count, ...rest } = shuttle;
+    return { ...rest, remainingSeats: remainingSeats(shuttle.capacity, _count.trips) };
   }
 
   /**
@@ -58,7 +74,7 @@ export class ShuttlesService {
       where: { eventId },
       include: {
         trips: { select: { pax: { select: { id: true, name: true } } } },
-        driverPax: { select: { contactPhone: true } },
+        driverPax: { select: { id: true, name: true, contactPhone: true } },
       },
       orderBy: [...SHUTTLES_ORDER],
     });
@@ -69,6 +85,7 @@ export class ShuttlesService {
 
       return {
         ...shuttle,
+        driverPax: driverPax ? { id: driverPax.id, name: driverPax.name } : null,
         remainingSeats: remainingSeats(shuttle.capacity, trips.length),
         passengers,
         driverContactPhone: isPassenger ? (driverPax?.contactPhone ?? null) : null,
@@ -80,7 +97,7 @@ export class ShuttlesService {
   async findOne(id: string) {
     const shuttle = await this.prisma.shuttle.findUnique({
       where: { id },
-      include: { trips: { include: { pax: true } } },
+      include: { trips: { include: { pax: true, station: true } }, driverPax: DRIVER_SELECT },
     });
     if (!shuttle) throw new NotFoundException("Navette introuvable");
 
@@ -98,7 +115,8 @@ export class ShuttlesService {
   }
 
   async update(id: string, dto: UpdateShuttleDto): Promise<Shuttle> {
-    await this.ensureExists(id);
+    const shuttle = await this.ensureExists(id);
+    if (dto.driverPaxId) await this.ensureDriverInEvent(shuttle.eventId, dto.driverPaxId);
     return this.prisma.shuttle.update({
       where: { id },
       data: omitUndefined({
@@ -112,8 +130,23 @@ export class ShuttlesService {
     });
   }
 
-  private async ensureExists(id: string): Promise<void> {
-    const shuttle = await this.prisma.shuttle.findUnique({ where: { id }, select: { id: true } });
+  private async ensureExists(id: string): Promise<{ id: string; eventId: string }> {
+    const shuttle = await this.prisma.shuttle.findUnique({
+      where: { id },
+      select: { id: true, eventId: true },
+    });
     if (!shuttle) throw new NotFoundException("Navette introuvable");
+    return shuttle;
+  }
+
+  /** Le/la conducteur·ice doit être un pax de l'évènement de la navette. */
+  private async ensureDriverInEvent(eventId: string, paxId: string): Promise<void> {
+    const pax = await this.prisma.pax.findUnique({
+      where: { id: paxId },
+      select: { eventId: true },
+    });
+    if (!pax || pax.eventId !== eventId) {
+      throw new BadRequestException("Le/la conducteur·ice doit être un pax de cet évènement");
+    }
   }
 }

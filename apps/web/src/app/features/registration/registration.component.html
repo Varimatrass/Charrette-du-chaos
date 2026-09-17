@@ -27,27 +27,22 @@
             <mat-label>Ton nom (le même que sur le Discord si possible)</mat-label>
             <input matInput formControlName="name" required />
           </mat-form-field>
-
           <mat-form-field appearance="outline">
             <mat-label>Email (optionnel)</mat-label>
             <input matInput type="email" formControlName="contactEmail" />
           </mat-form-field>
-
           <mat-form-field appearance="outline">
             <mat-label>Discord (optionnel)</mat-label>
             <input matInput formControlName="discordHandle" />
           </mat-form-field>
-
           <mat-form-field appearance="outline">
             <mat-label>Téléphone (optionnel)</mat-label>
             <input matInput formControlName="contactPhone" />
           </mat-form-field>
-
           <mat-form-field appearance="outline">
             <mat-label>Commentaire (optionnel)</mat-label>
             <textarea matInput formControlName="comment" rows="2"></textarea>
           </mat-form-field>
-
           <div class="actions">
             <button
               mat-flat-button
@@ -69,93 +64,40 @@
         </p>
 
         @for (direction of directions; track direction) {
-          <div class="trip-section stacked-form" [formGroup]="tripForms[direction]">
+          <section class="trip-section">
             <h3>{{ direction | directionLabel }}</h3>
-
-            <mat-form-field appearance="outline">
-              <mat-label>Moyen de transport</mat-label>
-              <mat-select formControlName="mode">
-                <mat-option [value]="null">Je sais pas encore</mat-option>
-                <mat-option [value]="TransportMode.TRAIN">{{
-                  TransportMode.TRAIN | transportModeLabel
-                }}</mat-option>
-                <mat-option [value]="TransportMode.CARPOOL">{{
-                  TransportMode.CARPOOL | transportModeLabel
-                }}</mat-option>
-                <mat-option [value]="TransportMode.OTHER">{{
-                  TransportMode.OTHER | transportModeLabel
-                }}</mat-option>
-              </mat-select>
-            </mat-form-field>
-
-            @if (tripForms[direction].value.mode === TransportMode.TRAIN) {
-              <mat-form-field appearance="outline">
-                <mat-label>Gare</mat-label>
-                <input matInput formControlName="station" />
-              </mat-form-field>
-            }
-
-            <mat-form-field appearance="outline">
-              <mat-label>Jour (si tu le connais déjà)</mat-label>
-              <input matInput type="date" formControlName="day" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Heure (si tu la connais déjà)</mat-label>
-              <input matInput type="time" formControlName="time" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Commentaire (optionnel)</mat-label>
-              <textarea matInput formControlName="comment" rows="2"></textarea>
-            </mat-form-field>
-          </div>
+            <app-trip-form [direction]="direction" [stations]="stations()" [event]="event()" />
+          </section>
         }
 
-        @if (showVehicleSection()) {
-          <div class="trip-section" [formGroup]="vehicleForm">
-            <h3>Véhicule et conduite</h3>
-            <p class="hint">
-              Question posée une seule fois, elle est valable pour l'aller comme pour le retour.
-            </p>
-
-            <p class="question">As-tu ton propre véhicule ?</p>
-            <mat-radio-group formControlName="hasVehicle">
+        @if (isDriver()) {
+          <section class="trip-section">
+            <h3>Ta voiture</h3>
+            <p class="hint">Elle apparaîtra dans la liste des covoits proposés aux autres paxs.</p>
+            <app-car-form />
+            <p class="question">Accepterais-tu de conduire des navettes gare ↔ lieu ?</p>
+            <mat-radio-group [formControl]="drivingForm.controls.willingToDriveShuttle">
               <mat-radio-button [value]="true">Oui</mat-radio-button>
               <mat-radio-button [value]="false">Non</mat-radio-button>
             </mat-radio-group>
-
-            @if (vehicleForm.value.hasVehicle === true) {
-              <p class="question">Accepterais-tu de le prêter pour des navettes ?</p>
-              <mat-radio-group formControlName="vehicleLendingMode">
-                <mat-radio-button [value]="VehicleLendingMode.NOT_AVAILABLE">Non</mat-radio-button>
-                <mat-radio-button [value]="VehicleLendingMode.ONLY_IF_OWNER_DRIVES">
-                  Oui, mais seulement si c'est moi qui conduis
-                </mat-radio-button>
-                <mat-radio-button [value]="VehicleLendingMode.AVAILABLE_ANY_DRIVER">
-                  Oui, même si quelqu'un d'autre conduit
-                </mat-radio-button>
-              </mat-radio-group>
-
-              <p class="question">Accepterais-tu de conduire des navettes ?</p>
-              <mat-radio-group formControlName="willingToDriveShuttle">
-                <mat-radio-button [value]="true">Oui</mat-radio-button>
-                <mat-radio-button [value]="false">Non</mat-radio-button>
-              </mat-radio-group>
-            }
-
-            @if (vehicleForm.value.hasVehicle === false) {
-              <p class="question">As-tu le permis ?</p>
-              <mat-radio-group formControlName="hasDrivingLicense">
-                <mat-radio-button [value]="true">Oui</mat-radio-button>
-                <mat-radio-button [value]="false">Non</mat-radio-button>
-              </mat-radio-group>
-
-              <p class="question">Voudrais-tu conduire des navettes (avec un véhicule prêté) ?</p>
-              <mat-radio-group formControlName="willingToDriveShuttle">
-                <mat-radio-button [value]="true">Oui</mat-radio-button>
-                <mat-radio-button [value]="false">Non</mat-radio-button>
-              </mat-radio-group>
-            }
-          </div>
+          </section>
+        } @else if (asksDrivingQuestions()) {
+          <section class="trip-section">
+            <h3>Conduite</h3>
+            <p class="hint">
+              Question posée une seule fois, valable pour l'aller comme pour le retour.
+            </p>
+            <p class="question">As-tu le permis ?</p>
+            <mat-radio-group [formControl]="drivingForm.controls.hasDrivingLicense">
+              <mat-radio-button [value]="true">Oui</mat-radio-button>
+              <mat-radio-button [value]="false">Non</mat-radio-button>
+            </mat-radio-group>
+            <p class="question">Voudrais-tu conduire des navettes (avec un véhicule prêté) ?</p>
+            <mat-radio-group [formControl]="drivingForm.controls.willingToDriveShuttle">
+              <mat-radio-button [value]="true">Oui</mat-radio-button>
+              <mat-radio-button [value]="false">Non</mat-radio-button>
+            </mat-radio-group>
+          </section>
         }
 
         <div class="actions">

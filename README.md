@@ -1,10 +1,11 @@
 # Charrette du Chaos — Gestion des navettes
 
-Outil communautaire pour gérer les navettes (et bientôt le covoiturage) des
+Outil communautaire pour gérer les navettes et le covoiturage des
 évènements en autogestion. Développé pour Le Désordre mais pensé pour être
-réutilisable par d'autres collectifs. Cette V1 couvre les **navettes gare ↔
-lieu** ; le covoiturage viendra dans une itération suivante (le modèle de
-données est déjà pensé pour).
+réutilisable par d'autres collectifs. L'appli couvre les **navettes gare ↔
+lieu** (créées par l'orga, les paxs s'y placent eux-mêmes) et le
+**covoiturage** (chaque pax déclare sa voiture, ou celle dans laquelle il
+monte, ou qu'il en cherche une).
 
 Voir aussi le document de spec complet (contexte, décisions produit) dans le
 projet Claude "Le désordre" → `spec-navettes-v1.md`.
@@ -158,15 +159,26 @@ deux cas : elle tourne toujours en conteneur.
 ## Créer un évènement et tester le parcours
 
 1. Va sur `http://localhost:4200/admin/connexion`, entre la valeur de `ADMIN_KEY`.
-2. Crée un évènement (nom, dates, lieu, gare de référence).
+2. Crée un évènement (nom, dates, lieu, gares desservies). Dans sa page
+   **Configuration**, ajoute/retire des gares, coche la gare desservie par
+   les navettes, et **ouvre l'évènement aux paxs** quand il est prêt : il
+   apparaît alors sur la page d'accueil (`/`), qui permet de s'inscrire ou de
+   retrouver son espace avec son code personnel.
 3. Le formulaire pax public est sur `http://localhost:4200/e/<id-de-l-evenement>`
-   — c'est ce lien qu'on partage aux paxs avant l'évènement.
+   — ce lien marche même si l'évènement n'est pas encore ouvert (pratique
+   pour tester). Le pax choisit train (gare de la liste, ou tape la sienne),
+   covoiturage (d'où il part, avec sa voiture ou en passager·e d'une voiture
+   déjà déclarée, ou en recherche) ou autre.
 4. Une fois inscrit·e, le pax atterrit sur `/mon-espace/<jeton>` : c'est son
-   lien personnel, à garder pour revenir modifier ses trajets aller/retour
-   quand il veut, sans jamais être bloqué.
-5. Dans le back-office (`/admin/events/<id>`), onglet **Navettes**, crée les
-   créneaux ; onglet **Trajets / demandes**, assigne chaque pax à une navette
-   via le menu déroulant.
+   lien personnel, à garder pour revenir modifier ses infos, sa voiture et
+   ses trajets aller/retour quand il veut. La page **Tableaux** à côté
+   montre qui vient et comment, les navettes et les trajets ; un pax peut s'y
+   placer lui-même dans une navette qui a de la place (pour son propre
+   trajet seulement).
+5. Dans le back-office (`/admin/events/<id>`), section **Navettes**, crée
+   les créneaux (le conducteur·ice est un pax de l'évènement) et gère les
+   passager·es ; section **Trajets**, assigne chaque pax à une navette via le
+   sélecteur.
 
 Pour ne pas tout saisir à la main, `pnpm prisma:seed` crée un évènement de
 démo ("[SEED] …") avec des navettes et une dizaine de paxs dans des
