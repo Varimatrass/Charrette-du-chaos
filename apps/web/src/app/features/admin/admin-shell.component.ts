@@ -86,7 +86,8 @@ function deepestParam(route: ActivatedRoute, name: string): string | null {
   let current: ActivatedRoute | null = route;
   let value: string | null = null;
   while (current) {
-    value = current.snapshot.paramMap.get(name) ?? value;
+    // À la création de la coque, les routes enfants n'ont pas encore de snapshot.
+    value = current.snapshot?.paramMap.get(name) ?? value;
     current = current.firstChild;
   }
   return value;

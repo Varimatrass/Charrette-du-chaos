@@ -43,7 +43,8 @@ export function summarizeTrip(
       const car = trip.carId ? carsById.get(trip.carId) : undefined;
       if (trip.carpoolRole === "DRIVER") return `Covoit · conduit${car ? ` (${car.name})` : ""}`;
       if (car) return `Covoit · passager·e de ${car.owner.name} (${car.name})`;
-      return trip.lookingForCarpool ? "Covoit · cherche un covoit" : "Covoit · passager·e";
+      if (trip.lookingForCarpool) return "Covoit · cherche un covoit";
+      return trip.carpoolRole === "PASSENGER" ? "Covoit · passager·e" : "Covoit";
     }
     case "OTHER":
       return "Autre";

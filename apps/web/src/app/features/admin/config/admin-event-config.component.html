@@ -82,15 +82,20 @@
           }
         </mat-radio-group>
       }
-      <form class="add-station" (ngSubmit)="addStation()">
+      <div class="add-station">
         <mat-form-field appearance="outline">
           <mat-label>Ajouter une gare</mat-label>
-          <input matInput [formControl]="newStationControl" />
+          <input matInput [formControl]="newStationControl" (keydown.enter)="addStation()" />
         </mat-form-field>
-        <button mat-stroked-button type="submit" [disabled]="!newStationControl.value.trim()">
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="!newStationControl.value.trim()"
+          (click)="addStation()"
+        >
           Ajouter
         </button>
-      </form>
+      </div>
     </mat-card>
   </div>
 }

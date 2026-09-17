@@ -1,4 +1,13 @@
-import { Component, computed, inject, signal, viewChild, viewChildren } from "@angular/core";
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+  viewChildren,
+} from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
@@ -15,6 +24,7 @@ import { forkJoin, of } from "rxjs";
 import { catchError } from "rxjs/operators";
 import { Direction, TripStatus } from "@desordre/shared-types";
 import type {
+  Car,
   CarOverview,
   DriverAvailabilitySlot,
   EventWithStations,
@@ -116,7 +126,32 @@ export class MySpaceComponent {
     comment: new FormControl("", { nonNullable: true }),
   });
 
+  /** Données chargées en attente d'un formulaire rendu pour les afficher. */
+  private readonly tripsToPatch = signal<PaxWithTrips["trips"] | null>(null);
+  private readonly carToPatch = signal<Car | null>(null);
+
   constructor() {
+    effect(() => {
+      const forms = this.tripForms();
+      const trips = this.tripsToPatch();
+      if (!trips || forms.length === 0) return;
+      untracked(() => {
+        for (const form of forms) {
+          const trip = trips.find((t) => t.direction === form.direction());
+          if (trip) form.patchFrom(trip);
+        }
+        this.tripsToPatch.set(null);
+      });
+    });
+    effect(() => {
+      const form = this.carForm();
+      const car = this.carToPatch();
+      if (!form || !car) return;
+      untracked(() => {
+        form.patchFrom(car);
+        this.carToPatch.set(null);
+      });
+    });
     this.load();
   }
 
@@ -156,14 +191,10 @@ export class MySpaceComponent {
       hasDrivingLicense: pax.hasDrivingLicense,
       willingToDriveShuttle: pax.willingToDriveShuttle,
     });
-    // Les formulaires de trajet sont dans la vue : on les remplit une fois rendus.
-    setTimeout(() => {
-      for (const form of this.tripForms()) {
-        const trip = pax.trips.find((t) => t.direction === form.direction());
-        if (trip) form.patchFrom(trip);
-      }
-      if (pax.car) this.carForm()?.patchFrom(pax.car);
-    });
+    // Les formulaires de trajet et de voiture sont rendus après le chargement :
+    // les `effect` du constructeur les remplissent dès qu'ils apparaissent.
+    this.tripsToPatch.set(pax.trips);
+    this.carToPatch.set(pax.car);
   }
 
   private loadMyAvailabilitySlots(): void {

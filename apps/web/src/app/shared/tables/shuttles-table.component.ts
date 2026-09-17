@@ -138,8 +138,13 @@ export class ShuttlesTableComponent {
   readonly addablePassengerOptions = computed<EntityOption[]>(() => {
     const editing = this.editingShuttle();
     if (!editing) return [];
+    // Les trajets sans navette d'abord (c'est eux qu'on cherche à placer), puis les autres.
     return this.directionTrips()
       .filter((trip) => trip.shuttleId !== editing.id)
+      .sort(
+        (a, b) =>
+          Number(!!a.shuttleId) - Number(!!b.shuttleId) || a.pax.name.localeCompare(b.pax.name),
+      )
       .map((trip) => ({
         id: trip.id,
         label: trip.pax.name,
