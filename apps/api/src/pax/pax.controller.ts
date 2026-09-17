@@ -1,21 +1,37 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { AdminGuard } from "../common/guards/admin.guard";
-import { CurrentPax } from "../common/decorators/current-pax.decorator";
-import { PaxTokenGuard } from "../common/guards/pax-token.guard";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import type { Pax } from "@prisma/client";
-import { NavettesService } from "../navettes/navettes.service";
-import { TrajetsService } from "../trajets/trajets.service";
-import { CreatePaxDto } from "./dto/create-pax.dto";
-import { RechercherPaxDto } from "./dto/rechercher-pax.dto";
-import { UpdatePaxDto } from "./dto/update-pax.dto";
-import { PaxService } from "./pax.service";
+import { AdminGuard } from "../common/guards/admin.guard.js";
+import { CurrentPax } from "../common/decorators/current-pax.decorator.js";
+import { EventIdQueryDto } from "../common/dto/event-id-query.dto.js";
+import { PaxTokenGuard } from "../common/guards/pax-token.guard.js";
+import { ShuttlesService } from "../shuttles/shuttles.service.js";
+import { TripsService } from "../trips/trips.service.js";
+import { CreatePaxDto } from "./dto/create-pax.dto.js";
+import { SearchPaxDto } from "./dto/search-pax.dto.js";
+import { UpdatePaxDto } from "./dto/update-pax.dto.js";
+import { PaxService } from "./pax.service.js";
 
+/**
+ * Parcours pax : inscription publique, puis auto-service via le lien
+ * personnel (`x-pax-token`) sous `/pax/me/...`. Les routes back-office sont
+ * sous `/admin/pax/...`.
+ */
 @Controller()
 export class PaxController {
   constructor(
     private readonly paxService: PaxService,
-    private readonly navettesService: NavettesService,
-    private readonly trajetsService: TrajetsService,
+    private readonly shuttlesService: ShuttlesService,
+    private readonly tripsService: TripsService,
   ) {}
 
   /** Première saisie, publique : n'importe qui avec le lien de l'évènement peut s'inscrire. */
@@ -26,13 +42,13 @@ export class PaxController {
 
   /** Auto-service : le pax revient avec son lien personnel (en-tête x-pax-token). */
   @UseGuards(PaxTokenGuard)
-  @Get("pax/moi")
+  @Get("pax/me")
   findMine(@CurrentPax() pax: Pax) {
     return this.paxService.findMine(pax);
   }
 
   @UseGuards(PaxTokenGuard)
-  @Patch("pax/moi")
+  @Patch("pax/me")
   updateMine(@CurrentPax() pax: Pax, @Body() dto: UpdatePaxDto) {
     return this.paxService.update(pax, dto);
   }
@@ -40,15 +56,15 @@ export class PaxController {
   /**
    * Planning des navettes de son évènement, en lecture seule : conducteur·ice,
    * véhicule, horaires, places restantes, et noms des co-passager·es (jamais
-   * leurs coordonnées de contact — voir NavettesService.findAllForEventPourPax).
+   * leurs coordonnées de contact — voir ShuttlesService.findAllForEventAsPax).
    * Exception : le téléphone du/de la conducteur·ice devient visible, mais
    * seulement pour les pax qui sont dans CETTE navette (d'où le `pax.id`
    * passé ici, pour que le service sache qui demande).
    */
   @UseGuards(PaxTokenGuard)
-  @Get("pax/moi/navettes")
-  navettesDeMonEvent(@CurrentPax() pax: Pax) {
-    return this.navettesService.findAllForEventPourPax(pax.eventId, pax.id);
+  @Get("pax/me/shuttles")
+  findMyEventShuttles(@CurrentPax() pax: Pax) {
+    return this.shuttlesService.findAllForEventAsPax(pax.eventId, pax.id);
   }
 
   /**
@@ -56,8 +72,8 @@ export class PaxController {
    * coordonnées de contact (email/téléphone) ni le jeton d'accès des autres.
    */
   @UseGuards(PaxTokenGuard)
-  @Get("pax/moi/paxs")
-  paxsDeMonEvent(@CurrentPax() pax: Pax) {
+  @Get("pax/me/paxs")
+  findMyEventPaxs(@CurrentPax() pax: Pax) {
     return this.paxService.findAllForEventOverview(pax.eventId);
   }
 
@@ -67,28 +83,28 @@ export class PaxController {
    * d'une navette (réservés à l'organisation).
    */
   @UseGuards(PaxTokenGuard)
-  @Get("pax/moi/trajets")
-  trajetsDeMonEvent(@CurrentPax() pax: Pax) {
-    return this.trajetsService.findAllForEventOverview(pax.eventId);
+  @Get("pax/me/trips")
+  findMyEventTrips(@CurrentPax() pax: Pax) {
+    return this.tripsService.findAllForEventOverview(pax.eventId);
   }
 
   /** Back-office : liste des paxs d'un évènement (inclut le jeton, pour renvoyer un lien perdu). */
   @UseGuards(AdminGuard)
   @Get("admin/pax")
-  findAllForEvent(@Query("eventId") eventId: string) {
-    return this.paxService.findAllForEvent(eventId);
+  findAllForEvent(@Query() query: EventIdQueryDto) {
+    return this.paxService.findAllForEvent(query.eventId);
   }
 
   /** Back-office : retrouver un pax par nom pour lui repartager son lien perdu. */
   @UseGuards(AdminGuard)
-  @Get("admin/pax/rechercher")
-  rechercher(@Query() query: RechercherPaxDto) {
-    return this.paxService.rechercher(query.eventId, query.nom);
+  @Get("admin/pax/search")
+  search(@Query() query: SearchPaxDto) {
+    return this.paxService.search(query.eventId, query.name);
   }
 
   @UseGuards(AdminGuard)
   @Get("admin/pax/:id")
-  findOneAdmin(@Param("id") id: string) {
+  findOneAdmin(@Param("id", ParseUUIDPipe) id: string) {
     return this.paxService.findOneAdmin(id);
   }
 }

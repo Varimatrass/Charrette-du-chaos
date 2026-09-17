@@ -2,7 +2,7 @@
   "name": "charrette-du-chaos",
   "private": true,
   "version": "0.1.0",
-  "description": "Charrette du Chaos — gestion des navettes (et bientôt du covoiturage) pour les évènements en autogestion",
+  "description": "Charrette du Chaos \u2014 gestion des navettes (et bient\u00f4t du covoiturage) pour les \u00e9v\u00e8nements en autogestion",
   "scripts": {
     "prepare": "pnpm --filter @desordre/shared-types run build",
     "dev:api": "pnpm --filter @desordre/api run start:dev",
@@ -11,7 +11,12 @@
     "prisma:generate": "pnpm --filter @desordre/api exec prisma generate",
     "prisma:migrate": "pnpm --filter @desordre/api exec prisma migrate dev",
     "prisma:studio": "pnpm --filter @desordre/api exec prisma studio",
-    "prisma:seed": "pnpm --filter @desordre/api exec prisma db seed"
+    "prisma:seed": "pnpm --filter @desordre/api exec prisma db seed",
+    "lint": "pnpm --filter @desordre/api run lint:check",
+    "test": "pnpm --filter @desordre/api run test",
+    "test:e2e": "pnpm --filter @desordre/api run test:e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "packageManager": "pnpm@10.28.0",
   "pnpm": {
@@ -25,5 +30,8 @@
       "@prisma/engines",
       "prisma"
     ]
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
   }
 }

@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { DriverAvailabilityController } from "./driver-availability.controller";
-import { DriverAvailabilityService } from "./driver-availability.service";
+import { DriverAvailabilityController } from "./driver-availability.controller.js";
+import { DriverAvailabilityService } from "./driver-availability.service.js";
 
 @Module({
   controllers: [DriverAvailabilityController],

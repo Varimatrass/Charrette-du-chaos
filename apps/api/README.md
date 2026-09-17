@@ -1,98 +1,74 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# @desordre/api — API NestJS
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST de Charrette du Chaos (NestJS 12 en ESM + Prisma 7 + PostgreSQL). Voir le
+README à la racine pour l'installation et le lancement ; ce fichier décrit
+l'organisation du code de l'API.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Organisation
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ pnpm install
+```
+src/
+  main.ts                  # démarrage (port, CORS) — crash franc si la base est injoignable
+  app.setup.ts             # ValidationPipe + CORS, partagé avec les tests d'intégration
+  app.module.ts
+  auth/                    # GET /admin/auth : vérification de la clé organisateur·ice
+  health/                  # GET /health
+  common/
+    constants.ts           # noms d'en-têtes (x-admin-key, x-pax-token) et de variables d'env
+    guards/                # AdminGuard (clé partagée), PaxTokenGuard (jeton personnel)
+    decorators/            # @CurrentPax()
+    pipes/                 # ParseEnumValuePipe pour nos enums `as const`
+    dto/                   # DTO de query string communs (eventId)
+    utils/                 # wait-level (attente en gare), dates, objects (omitUndefined...)
+  prisma/                  # PrismaService (connexion avec tentatives au démarrage)
+  events/ pax/ trips/ shuttles/ driver-availability/
+                           # un module Nest par ressource : controller + service + dto/
+  testing/                 # mock de PrismaService et fixtures pour les tests unitaires
+test/
+  *.e2e-spec.ts            # tests d'intégration HTTP (supertest) contre un vrai Postgres
+  support/                 # env de test, création/migration de la base, createTestApp()
+prisma/
+  schema.prisma            # source de vérité du modèle de données
+  migrations/              # SQL versionné (les renommages sont écrits à la main)
+  seed.ts                  # jeu de données de démo (`pnpm prisma:seed`)
 ```
 
-## Compile and run the project
+## Conventions
+
+- **Code en anglais, interface en français.** Identifiants, routes HTTP,
+  champs JSON, tables et colonnes sont en anglais ; les messages d'erreur
+  destinés aux utilisateur·ices et les commentaires restent en français.
+- **Vocabulaire :** `pax` (participant·e, gardé tel quel), `shuttle`
+  (navette), `trip` (trajet aller ou retour d'un pax), `direction`
+  (`OUTBOUND` = aller vers le lieu, `RETURN` = retour vers la gare),
+  `wait level` (indicateur d'attente en gare).
+- **Routes :** `/events` (lecture publique), `/pax` (inscription publique),
+  `/pax/me/...` (auto-service avec `x-pax-token`), `/admin/...` (back-office
+  avec `x-admin-key`).
+- **Mises à jour partielles :** un champ absent du body n'est pas touché, un
+  champ envoyé à `null` est effacé. Les DTO `Update*` dérivent des `Create*`
+  avec `PartialType`/`OmitType`.
+- **Enums :** déclarés dans `packages/shared-types` comme objets `as const`,
+  compatibles avec ceux générés par Prisma (pas de cast).
+
+## ESM
+
+Le package est en `"type": "module"` (Nest 12 n'existe qu'en ESM) : les
+imports relatifs portent l'extension `.js` (résolution `nodenext`), et les
+tests tournent avec **Vitest** + SWC (`vitest.config.ts`, `vitest.e2e.config.ts`)
+— SWC émet les métadonnées de décorateurs dont Nest et class-validator ont
+besoin, ce qu'esbuild ne fait pas.
+
+## Tests
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm test              # unitaires (Vitest, Prisma mocké) — src/**/*.spec.ts
+pnpm test:cov          # idem avec couverture
+pnpm test:e2e          # intégration (supertest) — test/*.e2e-spec.ts
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Les tests d'intégration démarrent la vraie application contre une base
+**dédiée** (`TEST_DATABASE_URL`, par défaut `charrette_test` sur le même
+serveur Postgres que le dev), créée si besoin, remise à zéro et migrée
+depuis les fichiers SQL de `prisma/migrations` avant la suite. Chaque test
+repart d'une base vide.

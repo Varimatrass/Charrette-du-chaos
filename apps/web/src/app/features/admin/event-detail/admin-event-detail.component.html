@@ -1,7 +1,7 @@
-<div class="page">
+<div class="page-wide">
   @if (event(); as e) {
-    <h1>{{ e.nom }}</h1>
-    <p class="sous-titre">{{ e.lieu }} — gare de référence : {{ e.gareReference }}</p>
+    <h1>{{ e.name }}</h1>
+    <p class="subtitle">{{ e.location }} — gare de référence : {{ e.referenceStation }}</p>
   }
 
   <mat-tab-group>
@@ -9,10 +9,10 @@
       <app-paxs-tab [eventId]="eventId"></app-paxs-tab>
     </mat-tab>
     <mat-tab label="Navettes">
-      <app-navettes-tab [eventId]="eventId"></app-navettes-tab>
+      <app-shuttles-tab [eventId]="eventId"></app-shuttles-tab>
     </mat-tab>
     <mat-tab label="Trajets / demandes">
-      <app-trajets-tab [eventId]="eventId"></app-trajets-tab>
+      <app-trips-tab [eventId]="eventId"></app-trips-tab>
     </mat-tab>
   </mat-tab-group>
 </div>

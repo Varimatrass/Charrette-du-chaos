@@ -1,0 +1,109 @@
+# Intégration continue : lint, formatage, build et tests sur chaque PR / push.
+#
+# Deux jobs indépendants pour paralléliser :
+# - api : types partagés + API (unitaires, puis intégration contre un vrai
+#   Postgres démarré en service, avec vérification que le schéma Prisma et
+#   les migrations sont cohérents)
+# - web : build de prod du frontend Angular
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: 10.28.0
+  NODE_VERSION: 22
+
+jobs:
+  api:
+    name: API — lint, build, tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: charrette
+          POSTGRES_PASSWORD: charrette
+          POSTGRES_DB: charrette_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U charrette"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://charrette:charrette@localhost:5432/charrette_test
+      TEST_DATABASE_URL: postgresql://charrette:charrette@localhost:5432/charrette_test
+      ADMIN_KEY: ci-admin-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies (builds shared-types via `prepare`)
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Generate Prisma client
+        run: pnpm prisma:generate
+
+      - name: Lint API
+        run: pnpm --filter @desordre/api run lint:check
+
+      - name: Build API
+        run: pnpm --filter @desordre/api run build
+
+      - name: Unit tests
+        run: pnpm --filter @desordre/api run test
+
+      # Les migrations sont appliquées avec l'outil officiel ici (le réseau
+      # le permet), puis on vérifie qu'elles reproduisent exactement le
+      # schéma Prisma : un `schema.prisma` modifié sans migration, ou une
+      # migration écrite à la main qui dévie, fait échouer ce job.
+      - name: Apply migrations
+        run: pnpm --filter @desordre/api exec prisma migrate deploy
+
+      - name: Check for schema drift
+        run: >-
+          pnpm --filter @desordre/api exec prisma migrate diff
+          --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+      - name: Integration tests
+        run: pnpm --filter @desordre/api run test:e2e
+
+  web:
+    name: Web — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web (production)
+        run: pnpm --filter @desordre/web run build

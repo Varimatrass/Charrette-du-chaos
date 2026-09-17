@@ -4,19 +4,19 @@ import type { CreateEventInput } from "@desordre/shared-types";
 export class CreateEventDto implements CreateEventInput {
   @IsString()
   @IsNotEmpty()
-  nom!: string;
+  name!: string;
 
   @IsDateString()
-  dateDebut!: string;
+  startDate!: string;
 
   @IsDateString()
-  dateFin!: string;
+  endDate!: string;
 
   @IsString()
   @IsNotEmpty()
-  lieu!: string;
+  location!: string;
 
   @IsString()
   @IsNotEmpty()
-  gareReference!: string;
+  referenceStation!: string;
 }

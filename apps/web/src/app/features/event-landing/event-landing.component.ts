@@ -7,7 +7,9 @@ import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import type { Event } from "@desordre/shared-types";
-import { ApiService } from "../../core/services/api.service";
+import { EventsApiService } from "../../core/api/events-api.service";
+import { appLinks } from "../../core/app-paths";
+import { extractAccessToken } from "../../core/utils/personal-link";
 
 /**
  * Écran d'accueil d'un évènement, sans jeton requis : point d'entrée pour
@@ -17,19 +19,26 @@ import { ApiService } from "../../core/services/api.service";
 @Component({
   selector: "app-event-landing",
   standalone: true,
-  imports: [DatePipe, ReactiveFormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    DatePipe,
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+  ],
   templateUrl: "./event-landing.component.html",
   styleUrl: "./event-landing.component.scss",
 })
 export class EventLandingComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly api = inject(ApiService);
+  private readonly eventsApi = inject(EventsApiService);
 
   readonly eventId = this.route.snapshot.paramMap.get("eventId")!;
   readonly event = signal<Event | null>(null);
-  readonly erreur = signal<string | null>(null);
-  readonly modeConnexion = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly loginMode = signal(false);
 
   readonly tokenControl = new FormControl("", {
     nonNullable: true,
@@ -37,40 +46,30 @@ export class EventLandingComponent {
   });
 
   constructor() {
-    this.api.recupererEvent(this.eventId).subscribe({
+    this.eventsApi.get(this.eventId).subscribe({
       next: (event) => this.event.set(event),
-      error: () => this.erreur.set("Impossible de charger cet évènement. Vérifie le lien."),
+      error: () => this.error.set("Impossible de charger cet évènement. Vérifie le lien."),
     });
   }
 
-  afficherConnexion(): void {
-    this.modeConnexion.set(true);
+  showLogin(): void {
+    this.loginMode.set(true);
   }
 
-  annulerConnexion(): void {
-    this.modeConnexion.set(false);
+  cancelLogin(): void {
+    this.loginMode.set(false);
     this.tokenControl.reset("");
   }
 
-  allerInscription(): void {
-    void this.router.navigate(["/e", this.eventId, "inscription"]);
+  goToRegistration(): void {
+    void this.router.navigate(appLinks.registration(this.eventId));
   }
 
-  seConnecter(): void {
+  login(): void {
     if (this.tokenControl.invalid) {
       this.tokenControl.markAsTouched();
       return;
     }
-    void this.router.navigate(["/mon-espace", this.extraireToken(this.tokenControl.value)]);
-  }
-
-  /**
-   * Certain·es collent le lien personnel complet (copié depuis un message)
-   * plutôt que juste le jeton : on récupère le jeton dans les deux cas.
-   */
-  private extraireToken(saisie: string): string {
-    const valeur = saisie.trim();
-    const correspondance = valeur.match(/\/mon-espace\/([^/\s?#]+)/);
-    return correspondance ? correspondance[1] : valeur;
+    void this.router.navigate(appLinks.mySpace(extractAccessToken(this.tokenControl.value)));
   }
 }

@@ -1,4 +1,12 @@
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 import { VehicleLendingMode } from "@desordre/shared-types";
 import type { CreatePaxInput } from "@desordre/shared-types";
 
@@ -8,7 +16,7 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsString()
   @IsNotEmpty()
-  nom!: string;
+  name!: string;
 
   @IsOptional()
   @IsEmail()
@@ -16,7 +24,7 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsOptional()
   @IsString()
-  contactTelephone?: string;
+  contactPhone?: string;
 
   @IsOptional()
   @IsString()
@@ -24,14 +32,14 @@ export class CreatePaxDto implements CreatePaxInput {
 
   @IsOptional()
   @IsString()
-  commentaire?: string;
+  comment?: string;
 
   @IsOptional()
   @IsBoolean()
   hasVehicle?: boolean;
 
   @IsOptional()
-  @IsEnum(VehicleLendingMode)
+  @IsIn(Object.values(VehicleLendingMode))
   vehicleLendingMode?: VehicleLendingMode;
 
   @IsOptional()

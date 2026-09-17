@@ -12,7 +12,7 @@ projet Claude "Le désordre" → `spec-navettes-v1.md`.
 ## Stack
 
 - **apps/web** — Angular 20 (standalone, TypeScript strict) + Angular Material
-- **apps/api** — NestJS 11 (TypeScript strict) + Prisma + PostgreSQL
+- **apps/api** — NestJS 12 (TypeScript strict, ESM) + Prisma + PostgreSQL
 - **packages/shared-types** — types et DTOs partagés entre le front et le back
 - **pnpm** workspaces comme gestionnaire de paquets
 
@@ -25,7 +25,7 @@ type Next.js) qui communiquent uniquement via l'API HTTP de `apps/api`.
   [Podman](https://podman.io/docs/installation) (avec le plugin `compose`) —
   c'est ce qui fait tourner la base de données, jamais installée "à la main"
   sur ta machine. Voir plus bas si tu utilises Podman.
-- Node.js ≥ 22.12 et [pnpm](https://pnpm.io/) ≥ 10 (`corepack enable` suffit)
+- Node.js ≥ 22.18 et [pnpm](https://pnpm.io/) ≥ 10 (`corepack enable` suffit)
   — nécessaires seulement si tu veux lancer l'API/le frontend en natif (voir
   "Lancer en développement" ci-dessous). Si tu fais tourner absolument tout
   en conteneurs, tu n'en as pas besoin sur ta machine.
@@ -76,11 +76,13 @@ commandes, deux rôles différents :
   nom de migration (ex: `init`) — c'est juste pour l'historique, tape ce que
   tu veux.
 
-Les deux ont besoin d'un accès internet normal (elles téléchargent des
-binaires Prisma) : ça n'a pas pu être vérifié bout en bout dans mon
-environnement cloud pour préparer ce scaffolding (réseau restreint côté
-sandbox), donc c'est la première vraie exécution chez toi — dis-moi si
-quelque chose coince.
+Les deux ont besoin d'un accès internet normal la première fois (elles
+téléchargent des binaires Prisma).
+
+Les migrations qui **renomment** des tables, colonnes ou valeurs d'enum sont
+écrites à la main dans `prisma/migrations/<date>_<nom>/migration.sql` (Prisma
+générerait un DROP + CREATE et perdrait les données). La CI vérifie que la
+chaîne de migrations reproduit exactement `schema.prisma`.
 
 ### Où vit la configuration de connexion (Prisma 7)
 
@@ -166,6 +168,38 @@ deux cas : elle tourne toujours en conteneur.
    créneaux ; onglet **Trajets / demandes**, assigne chaque pax à une navette
    via le menu déroulant.
 
+Pour ne pas tout saisir à la main, `pnpm prisma:seed` crée un évènement de
+démo ("[SEED] …") avec des navettes et une dizaine de paxs dans des
+situations variées.
+
+## Tests et qualité
+
+```bash
+pnpm lint            # ESLint sur l'API
+pnpm format:check    # Prettier sur tout le repo (pnpm format pour corriger)
+pnpm test            # tests unitaires de l'API (Vitest, base mockée)
+pnpm test:e2e        # tests d'intégration de l'API contre un vrai Postgres
+```
+
+Les tests d'intégration utilisent une base dédiée (`charrette_test` sur le
+Postgres du docker-compose, créée automatiquement au premier lancement ; ou
+`TEST_DATABASE_URL` pour pointer ailleurs). Voir `apps/api/README.md` pour
+le détail.
+
+Le workflow GitHub Actions (`.github/workflows/ci.yml`) rejoue tout ça sur
+chaque PR : formatage, lint, build de l'API et du front, tests unitaires,
+migrations + vérification qu'elles correspondent au schéma Prisma, tests
+d'intégration.
+
+## Conventions de code
+
+Le code (identifiants, routes HTTP, champs JSON, schéma de base) est en
+anglais ; les textes affichés, les messages d'erreur et les commentaires
+restent en français. Vocabulaire : `pax` (participant·e), `shuttle`
+(navette), `trip` (trajet aller/retour d'un pax), `direction`
+(`OUTBOUND`/`RETURN`). Les URL visibles par les paxs (`/e/<id>`,
+`/mon-espace/<jeton>`) restent en français : ce sont des liens partagés.
+
 ## Build de prod
 
 ```bash
@@ -193,9 +227,10 @@ itération à venir.
 ```
 apps/
   web/                  # Angular — formulaire pax + back-office organisateur·ice
-  api/                  # NestJS — API REST + Prisma
+  api/                  # NestJS — API REST + Prisma (voir apps/api/README.md)
 packages/
   shared-types/         # enums, modèles et DTOs partagés front/back
+.github/workflows/      # CI (lint, build, tests)
 docker-compose.yml      # base de données + (optionnellement) API/frontend en conteneurs
 ```
 

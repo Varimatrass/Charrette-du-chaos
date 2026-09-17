@@ -1,7 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import type { Request } from "express";
 import type { Pax } from "@prisma/client";
-import { PrismaService } from "../../prisma/prisma.service";
+import { PrismaService } from "../../prisma/prisma.service.js";
+import { PAX_TOKEN_HEADER } from "../constants.js";
 
 export interface RequestWithPax extends Request {
   pax: Pax;
@@ -19,10 +20,10 @@ export class PaxTokenGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithPax>();
-    const token = request.header("x-pax-token");
+    const token = request.header(PAX_TOKEN_HEADER);
 
     if (!token) {
-      throw new UnauthorizedException("Lien personnel manquant (en-tête x-pax-token)");
+      throw new UnauthorizedException(`Lien personnel manquant (en-tête ${PAX_TOKEN_HEADER})`);
     }
 
     const pax = await this.prisma.pax.findUnique({ where: { accessToken: token } });

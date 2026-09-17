@@ -1,4 +1,4 @@
-// Schéma Prisma — Le Désordre / Navettes
+// Schéma Prisma — Charrette du Chaos
 // Après avoir cloné le projet et renseigné DATABASE_URL dans apps/api/.env,
 // lance `pnpm prisma:generate` puis `pnpm prisma:migrate` depuis la racine.
 
@@ -13,21 +13,21 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Sens {
-  ALLER
-  RETOUR
+enum Direction {
+  OUTBOUND
+  RETURN
 }
 
-enum ModeTransport {
+enum TransportMode {
   TRAIN
-  COVOITURAGE
-  AUTRE
+  CARPOOL
+  OTHER
 }
 
-enum StatutTrajet {
-  EN_ATTENTE
-  ASSIGNE
-  A_REVERIFIER
+enum TripStatus {
+  PENDING
+  ASSIGNED
+  TO_RECHECK
 }
 
 // Nuance du prêt de véhicule pour les navettes : certain·es pax acceptent de
@@ -40,31 +40,31 @@ enum VehicleLendingMode {
 }
 
 model Event {
-  id            String   @id @default(uuid())
-  nom           String
-  dateDebut     DateTime @map("date_debut") @db.Date
-  dateFin       DateTime @map("date_fin") @db.Date
-  lieu          String
-  gareReference String   @map("gare_reference")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  name             String
+  startDate        DateTime @map("start_date") @db.Date
+  endDate          DateTime @map("end_date") @db.Date
+  location         String
+  referenceStation String   @map("reference_station")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   paxs                    Pax[]
-  navettes                Navette[]
-  trajets                 Trajet[]
+  shuttles                Shuttle[]
+  trips                   Trip[]
   driverAvailabilitySlots DriverAvailabilitySlot[]
 
   @@map("events")
 }
 
 model Pax {
-  id               String   @id @default(uuid())
-  eventId          String   @map("event_id")
-  nom              String
-  contactEmail     String?  @map("contact_email")
-  contactTelephone String?  @map("contact_telephone")
-  discordHandle    String?  @map("discord_handle")
-  commentaire      String?
+  id                    String              @id @default(uuid())
+  eventId               String              @map("event_id")
+  name                  String
+  contactEmail          String?             @map("contact_email")
+  contactPhone          String?             @map("contact_phone")
+  discordHandle         String?             @map("discord_handle")
+  comment               String?
   // Bloc véhicule/conduite (parcours d'inscription v2) : tout reste nullable
   // car non renseigné au départ pour les pax existants, et parce que "pas
   // encore répondu" doit rester distinct de "non" pour l'organisation.
@@ -76,88 +76,88 @@ model Pax {
   // de revenir modifier ses infos sans compte. Ne jamais l'exposer dans les
   // vues publiques/listes, seulement dans la réponse de création et le
   // back-office organisateur·ice.
-  accessToken      String   @unique @default(uuid()) @map("access_token")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  accessToken           String              @unique @default(uuid()) @map("access_token")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
 
   event                   Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  trajets                 Trajet[]
+  trips                   Trip[]
   driverAvailabilitySlots DriverAvailabilitySlot[]
   // Navettes dont ce pax est le/la conducteur·ice identifié·e (voir
-  // Navette.driverPaxId) : permet d'aller chercher son contactTelephone
-  // pour l'afficher aux co-passager·es de CES navettes précises, sans le
+  // Shuttle.driverPaxId) : permet d'aller chercher son contactPhone pour
+  // l'afficher aux co-passager·es de CES navettes précises, sans le
   // dupliquer sur la navette elle-même.
-  navettesConduites       Navette[]
+  drivenShuttles          Shuttle[]
 
   @@index([eventId])
   @@map("paxs")
 }
 
-model Navette {
-  id               String   @id @default(uuid())
-  eventId          String   @map("event_id")
-  libelle          String
-  jour             DateTime @db.Date
-  sens             Sens
+model Shuttle {
+  id                 String    @id @default(uuid())
+  eventId            String    @map("event_id")
+  label              String
+  day                DateTime  @db.Date
+  direction          Direction
   // Nom affiché du/de la conducteur·ice, texte libre : reste utilisable
   // tel quel pour un·e conducteur·ice qui n'est pas inscrit·e comme pax
   // (ex: un·e proche qui vient juste déposer/récupérer sans participer à
   // l'évènement). Quand `driverPaxId` est renseigné, l'admin garde la main
   // pour le faire correspondre au nom du pax, mais rien ne les lie en base
   // à part ce champ texte + la relation ci-dessous.
-  conducteur       String?
-  vehicule         String?
-  heureDepart      String   @map("heure_depart") // "HH:mm"
-  heureArriveeGare String   @map("heure_arrivee_gare") // "HH:mm"
-  heureRetourLieu  String?  @map("heure_retour_lieu") // "HH:mm"
-  capacite         Int
-  commentaire      String?
+  driverName         String?   @map("driver_name")
+  vehicle            String?
+  departureTime      String    @map("departure_time") // "HH:mm"
+  stationArrivalTime String    @map("station_arrival_time") // "HH:mm"
+  venueReturnTime    String?   @map("venue_return_time") // "HH:mm"
+  capacity           Int
+  comment            String?
   // Lien optionnel vers le pax qui conduit réellement cette navette : c'est
-  // ce qui permet d'exposer son contactTelephone aux pax qui sont dedans
-  // (voir NavettesService.findAllForEventPourPax), sans dupliquer le
+  // ce qui permet d'exposer son contactPhone aux pax qui sont dedans
+  // (voir ShuttlesService.findAllForEventAsPax), sans dupliquer le
   // numéro sur la navette elle-même. `null` si le/la conducteur·ice n'est
   // pas un pax de l'évènement — dans ce cas, pas de téléphone à afficher.
-  driverPaxId      String?  @map("driver_pax_id")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  driverPaxId        String?   @map("driver_pax_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  trajets   Trajet[]
-  driverPax Pax?     @relation(fields: [driverPaxId], references: [id], onDelete: SetNull)
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trips     Trip[]
+  driverPax Pax?   @relation(fields: [driverPaxId], references: [id], onDelete: SetNull)
 
   @@index([eventId])
   @@index([driverPaxId])
-  @@map("navettes")
+  @@map("shuttles")
 }
 
-model Trajet {
-  id      String @id @default(uuid())
-  eventId String @map("event_id")
-  paxId   String @map("pax_id")
-  sens    Sens
+model Trip {
+  id        String         @id @default(uuid())
+  eventId   String         @map("event_id")
+  paxId     String         @map("pax_id")
+  direction Direction
   // Nullable : à l'inscription, le mode de transport peut être "pas encore
   // décidé" (ex: arrivée en train, retour indécis) — le pax pourra revenir
   // le préciser plus tard, comme le reste du trajet.
-  mode        ModeTransport?
-  jour        DateTime?     @db.Date
-  heure       String? // "HH:mm"
-  gare        String?
-  navetteId   String?       @map("navette_id")
-  statut      StatutTrajet  @default(EN_ATTENTE)
-  commentaire String?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  mode      TransportMode?
+  day       DateTime?      @db.Date
+  time      String? // "HH:mm"
+  station   String?
+  shuttleId String?        @map("shuttle_id")
+  status    TripStatus     @default(PENDING)
+  comment   String?
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
 
   event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
-  navette Navette? @relation(fields: [navetteId], references: [id], onDelete: SetNull)
+  shuttle Shuttle? @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
 
-  // Un pax n'a qu'un seul trajet par sens (aller / retour) et par évènement.
-  // Il reste librement modifiable, jamais dupliqué.
-  @@unique([paxId, sens])
+  // Un pax n'a qu'un seul trajet par direction (aller / retour) et par
+  // évènement. Il reste librement modifiable, jamais dupliqué.
+  @@unique([paxId, direction])
   @@index([eventId])
-  @@index([navetteId])
-  @@map("trajets")
+  @@index([shuttleId])
+  @@map("trips")
 }
 
 // Créneau où un·e pax ayant accepté de conduire des navettes se déclare

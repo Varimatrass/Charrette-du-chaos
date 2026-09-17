@@ -1,15 +1,17 @@
-<div class="page">
-  <mat-card class="carte">
+<div class="page-centered">
+  <mat-card class="card">
     <h1>Espace organisateur·ice</h1>
-    <form [formGroup]="form" (ngSubmit)="soumettre()">
+    <form [formGroup]="form" (ngSubmit)="submit()" class="stacked-form">
       <mat-form-field appearance="outline">
         <mat-label>Clé d'accès</mat-label>
-        <input matInput type="password" formControlName="cle" required />
+        <input matInput type="password" formControlName="key" required />
       </mat-form-field>
-      @if (erreur()) {
-        <p class="erreur">{{ erreur() }}</p>
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
       }
-      <button mat-flat-button color="primary" type="submit" [disabled]="enCours()">Entrer</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+        Entrer
+      </button>
     </form>
   </mat-card>
 </div>

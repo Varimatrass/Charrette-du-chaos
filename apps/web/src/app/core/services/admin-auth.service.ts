@@ -10,20 +10,36 @@ const STORAGE_KEY = "desordre-admin-key";
  */
 @Injectable({ providedIn: "root" })
 export class AdminAuthService {
-  private readonly keySignal = signal<string | null>(localStorage.getItem(STORAGE_KEY));
+  private readonly keySignal = signal<string | null>(readStoredKey());
   readonly key = this.keySignal.asReadonly();
 
-  get isConnected(): boolean {
-    return !!this.keySignal();
+  get isAuthenticated(): boolean {
+    return this.keySignal() !== null;
   }
 
   setKey(key: string): void {
-    localStorage.setItem(STORAGE_KEY, key);
+    try {
+      localStorage.setItem(STORAGE_KEY, key);
+    } catch {
+      // Stockage indisponible (navigation privée...) : la clé ne survivra pas au rechargement, tant pis.
+    }
     this.keySignal.set(key);
   }
 
   clear(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // idem
+    }
     this.keySignal.set(null);
+  }
+}
+
+function readStoredKey(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
   }
 }

@@ -1,19 +1,19 @@
-import { ModeTransport, NiveauAttente, Sens, StatutTrajet, VehicleLendingMode } from "./enums";
+import { Direction, TransportMode, TripStatus, VehicleLendingMode, WaitLevel } from "./enums";
 
 /**
  * Toutes les dates/heures transitent en JSON sous forme de chaînes ISO 8601.
- * `jour` est une date (YYYY-MM-DD), `heure` une heure locale (HH:mm).
+ * `day` est une date (YYYY-MM-DD), `time` une heure locale (HH:mm).
  */
 export type IsoDate = string;
 export type IsoTime = string;
 
 export interface Event {
   id: string;
-  nom: string;
-  dateDebut: IsoDate;
-  dateFin: IsoDate;
-  lieu: string;
-  gareReference: string;
+  name: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  location: string;
+  referenceStation: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,11 +25,11 @@ export interface Event {
 export interface Pax {
   id: string;
   eventId: string;
-  nom: string;
+  name: string;
   contactEmail: string | null;
-  contactTelephone: string | null;
+  contactPhone: string | null;
   discordHandle: string | null;
-  commentaire: string | null;
+  comment: string | null;
   // Bloc véhicule/conduite : `null` veut dire "pas encore répondu", à
   // distinguer de `false` ("non"). `vehicleLendingMode` n'a de sens que
   // si `hasVehicle` est `true`.
@@ -49,55 +49,55 @@ export interface PaxAdmin extends Pax {
   accessToken: string;
 }
 
-export interface Trajet {
+export interface Trip {
   id: string;
   eventId: string;
   paxId: string;
-  sens: Sens;
+  direction: Direction;
   // `null` = mode de transport pas encore décidé à l'inscription (le pax
   // pourra revenir le préciser plus tard, comme le reste du trajet).
-  mode: ModeTransport | null;
-  jour: IsoDate | null;
-  heure: IsoTime | null;
-  gare: string | null;
-  navetteId: string | null;
-  statut: StatutTrajet;
-  commentaire: string | null;
+  mode: TransportMode | null;
+  day: IsoDate | null;
+  time: IsoTime | null;
+  station: string | null;
+  shuttleId: string | null;
+  status: TripStatus;
+  comment: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface Navette {
+export interface Shuttle {
   id: string;
   eventId: string;
-  libelle: string;
-  jour: IsoDate;
-  sens: Sens;
-  conducteur: string | null;
-  vehicule: string | null;
-  heureDepart: IsoTime;
-  heureArriveeGare: IsoTime;
-  heureRetourLieu: IsoTime | null;
-  capacite: number;
-  commentaire: string | null;
+  label: string;
+  day: IsoDate;
+  direction: Direction;
+  driverName: string | null;
+  vehicle: string | null;
+  departureTime: IsoTime;
+  stationArrivalTime: IsoTime;
+  venueReturnTime: IsoTime | null;
+  capacity: number;
+  comment: string | null;
   // Pax identifié comme le/la conducteur·ice réel·le de cette navette,
   // `null` si non renseigné ou si le/la conducteur·ice n'est pas un pax de
-  // l'évènement. Permet d'aller chercher son contactTelephone pour
-  // l'exposer aux co-passager·es (voir NavetteAvecNomsPassagers).
+  // l'évènement. Permet d'aller chercher son contactPhone pour l'exposer
+  // aux co-passager·es (voir ShuttleWithPassengerNames).
   driverPaxId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /** Un trajet avec le pax qu'il concerne, pour l'affichage admin. */
-export interface TrajetAvecPax extends Trajet {
+export interface TripWithPax extends Trip {
   pax: Pax;
-  niveauAttente: NiveauAttente | null;
+  waitLevel: WaitLevel | null;
 }
 
 /** Une navette avec ses places restantes calculées. */
-export interface NavetteAvecPlacesRestantes extends Navette {
-  placesRestantes: number;
+export interface ShuttleWithRemainingSeats extends Shuttle {
+  remainingSeats: number;
 }
 
 /**
@@ -108,32 +108,31 @@ export interface NavetteAvecPlacesRestantes extends Navette {
  * pour se retrouver), mais leurs coordonnées de contact restent privées
  * entre elleux.
  */
-export interface PassagerNom {
+export interface PassengerName {
   paxId: string;
-  nom: string;
+  name: string;
 }
 
 /**
  * Vue d'une navette pour les paxs : conducteur·ice/véhicule (déjà sur
- * `Navette`), places restantes, et noms des co-passager·es — jamais leurs
+ * `Shuttle`), places restantes, et noms des co-passager·es — jamais leurs
  * coordonnées de contact.
  *
- * Exception ciblée (Phase 4) : `driverContactPhone` porte le téléphone du
- * pax identifié comme conducteur·ice — mais UNIQUEMENT quand le pax qui
+ * Exception ciblée : `driverContactPhone` porte le téléphone du pax
+ * identifié comme conducteur·ice — mais UNIQUEMENT quand le pax qui
  * consulte cette navette en fait lui/elle-même partie (voir le calcul côté
- * `NavettesService.findAllForEventPourPax`). `null` pour tout le monde
+ * `ShuttlesService.findAllForEventAsPax`). `null` pour tout le monde
  * d'autre, ou si aucun pax n'est identifié comme conducteur·ice.
  */
-export interface NavetteAvecNomsPassagers extends NavetteAvecPlacesRestantes {
-  passagers: PassagerNom[];
+export interface ShuttleWithPassengerNames extends ShuttleWithRemainingSeats {
+  passengers: PassengerName[];
   driverContactPhone: string | null;
 }
 
 /** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */
-export interface NavetteAvecPassagers extends NavetteAvecPlacesRestantes {
-  passagers: TrajetAvecPax[];
+export interface ShuttleWithPassengers extends ShuttleWithRemainingSeats {
+  passengers: TripWithPax[];
 }
-
 
 /**
  * Créneau où un·e pax ayant accepté de conduire des navettes se déclare
@@ -158,14 +157,13 @@ export interface DriverAvailabilitySlot {
  * (l'admin a de toute façon accès à ces infos ailleurs, pas une nouvelle
  * fuite de confidentialité).
  */
-export interface DriverAvailabilitySlotAvecPax extends DriverAvailabilitySlot {
+export interface DriverAvailabilitySlotWithPax extends DriverAvailabilitySlot {
   pax: {
     id: string;
-    nom: string;
-    contactTelephone: string | null;
+    name: string;
+    contactPhone: string | null;
   };
 }
-
 
 /**
  * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais
@@ -175,9 +173,9 @@ export interface DriverAvailabilitySlotAvecPax extends DriverAvailabilitySlot {
  */
 export interface PaxOverview {
   id: string;
-  nom: string;
+  name: string;
   discordHandle: string | null;
-  commentaire: string | null;
+  comment: string | null;
   hasVehicle: boolean | null;
   vehicleLendingMode: VehicleLendingMode | null;
   hasDrivingLicense: boolean | null;
@@ -190,17 +188,25 @@ export interface PaxOverview {
  * assignée s'il y en a une — jamais le commentaire du trajet ou de la
  * navette, réservés à l'organisation.
  */
-export interface TrajetOverview {
+export interface TripOverview {
   id: string;
   paxId: string;
-  paxNom: string;
-  sens: Sens;
-  mode: ModeTransport | null;
-  jour: IsoDate | null;
-  heure: IsoTime | null;
-  gare: string | null;
-  statut: StatutTrajet;
-  navetteId: string | null;
-  navetteLibelle: string | null;
-  niveauAttente: NiveauAttente | null;
+  paxName: string;
+  direction: Direction;
+  mode: TransportMode | null;
+  day: IsoDate | null;
+  time: IsoTime | null;
+  station: string | null;
+  status: TripStatus;
+  shuttleId: string | null;
+  shuttleLabel: string | null;
+  waitLevel: WaitLevel | null;
+}
+
+/**
+ * Vue "mon espace" renvoyée par GET /pax/me : le pax + ses trajets, avec la
+ * navette éventuellement assignée à chacun.
+ */
+export interface PaxWithTrips extends Pax {
+  trips: (Trip & { shuttle: Shuttle | null })[];
 }

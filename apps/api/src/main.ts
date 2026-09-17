@@ -1,29 +1,20 @@
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
-import { ValidationPipe } from "@nestjs/common";
-import { AppModule } from "./app.module";
+import { Logger } from "@nestjs/common";
+import { AppModule } from "./app.module.js";
+import { configureApp } from "./app.setup.js";
+import { DEFAULT_PORT, ENV } from "./common/constants.js";
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
+  configureApp(app, { corsOrigins: config.get<string>(ENV.CORS_ORIGINS) });
+  app.enableShutdownHooks();
 
-  const corsOrigins = (config.get<string>("CORS_ORIGINS") ?? "http://localhost:4200")
-    .split(",")
-    .map((origin) => origin.trim());
-  app.enableCors({ origin: corsOrigins });
-
-  const port = config.get<string>("PORT") ?? 3000;
+  const port = config.get<string>(ENV.PORT) ?? DEFAULT_PORT;
   await app.listen(port);
-  // eslint-disable-next-line no-console
-  console.log(`API Désordre Navettes démarrée sur http://localhost:${port}`);
+  new Logger("Bootstrap").log(`API Charrette du Chaos démarrée sur http://localhost:${port}`);
 }
 
 // Si le démarrage échoue (ex: base de données injoignable — voir
@@ -31,8 +22,10 @@ async function bootstrap() {
 // "à moitié démarré" tourner en silence : on logge clairement l'erreur et on
 // quitte avec un code non nul, pour que ce soit visible immédiatement dans le
 // terminal (et détectable par un outil de supervision en prod).
-bootstrap().catch((error) => {
-  // eslint-disable-next-line no-console
-  console.error("Échec du démarrage de l'API :", error);
+bootstrap().catch((error: unknown) => {
+  new Logger("Bootstrap").error(
+    "Échec du démarrage de l'API",
+    error instanceof Error ? error.stack : String(error),
+  );
   process.exit(1);
 });

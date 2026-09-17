@@ -1,5 +1,5 @@
 import { Component, inject, input, OnChanges, signal } from "@angular/core";
-import { FormControl, FormGroup, ReactiveFormsModule } from "@angular/forms";
+import { FormControl, ReactiveFormsModule } from "@angular/forms";
 import { MatButtonModule } from "@angular/material/button";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatIconModule } from "@angular/material/icon";
@@ -7,8 +7,10 @@ import { MatInputModule } from "@angular/material/input";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import type { PaxAdmin } from "@desordre/shared-types";
-import { ApiService } from "../../../../core/services/api.service";
+import { AdminApiService } from "../../../../core/api/admin-api.service";
+import { buildPersonalLink } from "../../../../core/utils/personal-link";
 
+/** Liste des paxs d'un évènement, recherche par nom et récupération d'un lien personnel perdu. */
 @Component({
   selector: "app-paxs-tab",
   standalone: true,
@@ -27,44 +29,47 @@ import { ApiService } from "../../../../core/services/api.service";
 export class PaxsTabComponent implements OnChanges {
   readonly eventId = input.required<string>();
 
-  private readonly api = inject(ApiService);
+  private readonly adminApi = inject(AdminApiService);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly colonnes = ["nom", "contact", "lien"];
+  readonly columns = ["name", "contact", "link"];
   readonly paxs = signal<PaxAdmin[]>([]);
-  readonly paxOuvert = signal<string | null>(null);
+  readonly openedPaxId = signal<string | null>(null);
 
-  readonly rechercheForm = new FormGroup({
-    nom: new FormControl("", { nonNullable: true }),
-  });
+  readonly searchControl = new FormControl("", { nonNullable: true });
 
   ngOnChanges(): void {
-    this.charger();
+    this.load();
   }
 
-  charger(): void {
-    this.api.listerPaxsEvent(this.eventId()).subscribe((paxs) => this.paxs.set(paxs));
+  load(): void {
+    this.adminApi.listPaxs(this.eventId()).subscribe((paxs) => this.paxs.set(paxs));
   }
 
-  rechercher(): void {
-    const nom = this.rechercheForm.getRawValue().nom.trim();
-    if (!nom) {
-      this.charger();
+  search(): void {
+    const name = this.searchControl.value.trim();
+    if (!name) {
+      this.load();
       return;
     }
-    this.api.rechercherPax(this.eventId(), nom).subscribe((paxs) => this.paxs.set(paxs));
+    this.adminApi.searchPaxs(this.eventId(), name).subscribe((paxs) => this.paxs.set(paxs));
   }
 
-  basculerLien(paxId: string): void {
-    this.paxOuvert.set(this.paxOuvert() === paxId ? null : paxId);
+  resetSearch(): void {
+    this.searchControl.reset();
+    this.load();
   }
 
-  lienDe(pax: PaxAdmin): string {
-    return `${window.location.origin}/mon-espace/${pax.accessToken}`;
+  toggleLink(paxId: string): void {
+    this.openedPaxId.update((current) => (current === paxId ? null : paxId));
   }
 
-  copierLien(pax: PaxAdmin): void {
-    void navigator.clipboard.writeText(this.lienDe(pax));
-    this.snackBar.open(`Lien de ${pax.nom} copié.`, undefined, { duration: 2000 });
+  personalLinkOf(pax: PaxAdmin): string {
+    return buildPersonalLink(pax.accessToken);
+  }
+
+  copyLink(pax: PaxAdmin): void {
+    void navigator.clipboard.writeText(this.personalLinkOf(pax));
+    this.snackBar.open(`Lien de ${pax.name} copié.`, undefined, { duration: 2000 });
   }
 }

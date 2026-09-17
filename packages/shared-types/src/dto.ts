@@ -1,13 +1,16 @@
-import { ModeTransport, Sens, StatutTrajet, VehicleLendingMode } from "./enums";
+import { Direction, TransportMode, TripStatus, VehicleLendingMode } from "./enums";
+
+/** Tous les champs facultatifs, et effaçables avec `null`. */
+export type Nullable<T> = { [K in keyof T]?: T[K] | null };
 
 // ---- Évènement ----
 
 export interface CreateEventInput {
-  nom: string;
-  dateDebut: string;
-  dateFin: string;
-  lieu: string;
-  gareReference: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  referenceStation: string;
 }
 
 export type UpdateEventInput = Partial<CreateEventInput>;
@@ -20,77 +23,92 @@ export type UpdateEventInput = Partial<CreateEventInput>;
  */
 export interface CreatePaxInput {
   eventId: string;
-  nom: string;
+  name: string;
   contactEmail?: string;
-  contactTelephone?: string;
+  contactPhone?: string;
   discordHandle?: string;
-  commentaire?: string;
+  comment?: string;
   hasVehicle?: boolean;
   vehicleLendingMode?: VehicleLendingMode;
   hasDrivingLicense?: boolean;
   willingToDriveShuttle?: boolean;
 }
 
-export type UpdatePaxInput = Partial<Omit<CreatePaxInput, "eventId">>;
+/**
+ * Mise à jour partielle : un champ absent n'est pas touché, un champ à `null`
+ * est effacé (ex: retirer son email). Le nom, lui, ne peut pas être effacé.
+ */
+export type UpdatePaxInput = { name?: string } & Nullable<Omit<CreatePaxInput, "eventId" | "name">>;
 
 /** Renvoyé une seule fois, juste après la création du pax. */
 export interface PaxSubmissionResult {
-  pax: { id: string; nom: string };
+  pax: { id: string; name: string };
   accessToken: string;
   /** Lien complet à afficher/copier côté frontend, ex: /mon-espace/<token> */
-  lienPersonnel: string;
+  personalLink: string;
 }
 
 // ---- Trajet ----
 
-export interface CreateTrajetInput {
-  sens: Sens;
-  // Facultatif : le mode de transport peut être "pas encore décidé" à
-  // l'inscription et précisé plus tard.
-  mode?: ModeTransport;
-  jour?: string;
-  heure?: string;
-  gare?: string;
-  commentaire?: string;
+/**
+ * Corps de PUT /pax/me/trips/:direction — la direction vient de l'URL, pas
+ * du body. Tous les champs sont facultatifs : "pas encore décidé" est un
+ * état valide à l'inscription, à compléter plus tard.
+ */
+export interface UpsertTripInput {
+  mode?: TransportMode;
+  day?: string;
+  time?: string;
+  station?: string;
+  comment?: string;
 }
-
-export type UpdateTrajetInput = Partial<CreateTrajetInput>;
 
 /** Action réservée au back-office organisateur·ice. */
-export interface AssignerTrajetInput {
-  navetteId: string | null;
+export interface AssignTripInput {
+  shuttleId: string | null;
 }
 
-export interface SetStatutTrajetInput {
-  statut: StatutTrajet;
+export interface SetTripStatusInput {
+  status: TripStatus;
 }
 
 // ---- Navette ----
 
-export interface CreateNavetteInput {
+export interface CreateShuttleInput {
   eventId: string;
-  libelle: string;
-  jour: string;
-  sens: Sens;
-  conducteur?: string;
-  vehicule?: string;
-  heureDepart: string;
-  heureArriveeGare: string;
-  heureRetourLieu?: string;
-  capacite: number;
-  commentaire?: string;
+  label: string;
+  day: string;
+  direction: Direction;
+  driverName?: string;
+  vehicle?: string;
+  departureTime: string;
+  stationArrivalTime: string;
+  venueReturnTime?: string;
+  capacity: number;
+  comment?: string;
   driverPaxId?: string;
 }
 
-export type UpdateNavetteInput = Partial<Omit<CreateNavetteInput, "eventId">>;
+/** Les champs obligatoires d'une navette peuvent être omis mais jamais mis à `null`. */
+export type UpdateShuttleInput = Partial<
+  Pick<
+    CreateShuttleInput,
+    "label" | "day" | "direction" | "departureTime" | "stationArrivalTime" | "capacity"
+  >
+> &
+  Nullable<
+    Pick<
+      CreateShuttleInput,
+      "driverName" | "vehicle" | "venueReturnTime" | "comment" | "driverPaxId"
+    >
+  >;
 
 // ---- Recherche / lookup admin ----
 
-export interface RechercherPaxQuery {
+export interface SearchPaxQuery {
   eventId: string;
-  nom: string;
+  name: string;
 }
-
 
 // ---- Créneaux de disponibilité conducteur·ice ----
 

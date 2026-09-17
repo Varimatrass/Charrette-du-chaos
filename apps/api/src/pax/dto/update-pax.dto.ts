@@ -1,41 +1,19 @@
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
-import { VehicleLendingMode } from "@desordre/shared-types";
+import { OmitType, PartialType } from "@nestjs/mapped-types";
+import { IsNotEmpty, IsString, ValidateIf } from "class-validator";
 import type { UpdatePaxInput } from "@desordre/shared-types";
+import { CreatePaxDto } from "./create-pax.dto.js";
 
-export class UpdatePaxDto implements UpdatePaxInput {
-  @IsOptional()
+/**
+ * Mise à jour partielle : un champ absent n'est pas touché, un champ à `null`
+ * est effacé. L'évènement d'un pax ne change jamais après coup, et son nom
+ * peut être modifié mais pas effacé.
+ */
+export class UpdatePaxDto
+  extends PartialType(OmitType(CreatePaxDto, ["eventId", "name"] as const))
+  implements UpdatePaxInput
+{
+  @ValidateIf((_object, value) => value !== undefined)
   @IsString()
-  nom?: string;
-
-  @IsOptional()
-  @IsEmail()
-  contactEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  contactTelephone?: string;
-
-  @IsOptional()
-  @IsString()
-  discordHandle?: string;
-
-  @IsOptional()
-  @IsString()
-  commentaire?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  hasVehicle?: boolean;
-
-  @IsOptional()
-  @IsEnum(VehicleLendingMode)
-  vehicleLendingMode?: VehicleLendingMode;
-
-  @IsOptional()
-  @IsBoolean()
-  hasDrivingLicense?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  willingToDriveShuttle?: boolean;
+  @IsNotEmpty()
+  name?: string;
 }
