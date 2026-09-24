@@ -42,16 +42,22 @@ ALTER TABLE "events" ADD COLUMN "preferred_station_id" TEXT;
 ALTER TABLE "events" ADD CONSTRAINT "events_preferred_station_id_fkey"
   FOREIGN KEY ("preferred_station_id") REFERENCES "stations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- Les noms de gares sont normalisés comme le fait l'appli
+-- (normalizeStationName : espaces retirés aux bords, espaces multiples
+-- réduits à un seul), sinon "Lyon Part-Dieu " et "Lyon  Part-Dieu"
+-- deviendraient deux gares distinctes du même évènement.
+
 -- La gare de référence de chaque évènement devient sa gare préférée.
 INSERT INTO "stations" ("id", "event_id", "name", "updated_at")
-SELECT gen_random_uuid()::text, "id", "reference_station", CURRENT_TIMESTAMP
+SELECT gen_random_uuid()::text, "id", btrim(regexp_replace("reference_station", '\s+', ' ', 'g')), CURRENT_TIMESTAMP
 FROM "events"
-WHERE "reference_station" IS NOT NULL AND btrim("reference_station") <> '';
+WHERE "reference_station" IS NOT NULL
+  AND btrim(regexp_replace("reference_station", '\s+', ' ', 'g')) <> '';
 
 UPDATE "events" e
 SET "preferred_station_id" = s."id"
 FROM "stations" s
-WHERE s."event_id" = e."id" AND s."name" = e."reference_station";
+WHERE s."event_id" = e."id" AND s."name" = btrim(regexp_replace(e."reference_station", '\s+', ' ', 'g'));
 
 ALTER TABLE "events" DROP COLUMN "reference_station";
 
@@ -108,17 +114,17 @@ ALTER TABLE "trips" ADD CONSTRAINT "trips_car_id_fkey"
 
 -- Les gares tapées en texte libre deviennent des gares de l'évènement.
 INSERT INTO "stations" ("id", "event_id", "name", "updated_at")
-SELECT gen_random_uuid()::text, t."event_id", btrim(t."station"), CURRENT_TIMESTAMP
+SELECT gen_random_uuid()::text, t."event_id", t."name", CURRENT_TIMESTAMP
 FROM (
-  SELECT DISTINCT "event_id", "station" FROM "trips"
-  WHERE "station" IS NOT NULL AND btrim("station") <> ''
+  SELECT DISTINCT "event_id", btrim(regexp_replace("station", '\s+', ' ', 'g')) AS "name" FROM "trips"
+  WHERE "station" IS NOT NULL AND btrim(regexp_replace("station", '\s+', ' ', 'g')) <> ''
 ) t
 ON CONFLICT ("event_id", "name") DO NOTHING;
 
 UPDATE "trips" t
 SET "station_id" = s."id"
 FROM "stations" s
-WHERE s."event_id" = t."event_id" AND s."name" = btrim(t."station");
+WHERE s."event_id" = t."event_id" AND s."name" = btrim(regexp_replace(t."station", '\s+', ' ', 'g'));
 
 ALTER TABLE "trips" DROP COLUMN "station";
 
