@@ -1,91 +1,72 @@
-import { Component, inject, signal } from "@angular/core";
-import { ActivatedRoute } from "@angular/router";
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+  viewChildren,
+} from "@angular/core";
+import { DatePipe } from "@angular/common";
+import { ActivatedRoute, RouterLink } from "@angular/router";
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from "@angular/forms";
+import { MatButtonModule } from "@angular/material/button";
 import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
-import { MatInputModule } from "@angular/material/input";
-import { MatSelectModule } from "@angular/material/select";
-import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
-import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { MatInputModule } from "@angular/material/input";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
-import { MatTableModule } from "@angular/material/table";
-import { DatePipe } from "@angular/common";
-import { Direction, TransportMode, TripStatus, VehicleLendingMode } from "@desordre/shared-types";
+import { MatRadioModule } from "@angular/material/radio";
+import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
+import { HttpErrorResponse } from "@angular/common/http";
+import { forkJoin, of } from "rxjs";
+import { catchError } from "rxjs/operators";
+import { Direction, TripStatus } from "@desordre/shared-types";
 import type {
+  Car,
+  CarOverview,
   DriverAvailabilitySlot,
-  PassengerName,
-  PaxOverview,
+  EventWithStations,
   PaxWithTrips,
   Shuttle,
-  ShuttleWithPassengerNames,
-  TripOverview,
+  Station,
 } from "@desordre/shared-types";
+import { EventsApiService } from "../../core/api/events-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
+import { appLinks } from "../../core/app-paths";
 import { DIRECTIONS } from "../../core/labels";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
-import { emptyToNull, emptyToUndefined, toDateInputValue } from "../../core/utils/forms";
-
-interface TripForm {
-  mode: FormControl<TransportMode | null>;
-  day: FormControl<string>;
-  time: FormControl<string>;
-  station: FormControl<string>;
-  comment: FormControl<string>;
-}
-
-function createTripForm(): FormGroup<TripForm> {
-  return new FormGroup<TripForm>({
-    mode: new FormControl<TransportMode | null>(null),
-    day: new FormControl("", { nonNullable: true }),
-    time: new FormControl("", { nonNullable: true }),
-    station: new FormControl("", { nonNullable: true }),
-    comment: new FormControl("", { nonNullable: true }),
-  });
-}
+import { emptyToNull, emptyToUndefined } from "../../core/utils/forms";
+import { CarFormComponent } from "../../shared/car-form/car-form.component";
+import { TripFormComponent } from "../../shared/trip-form/trip-form.component";
 
 const SNACKBAR_SHORT_MS = 2000;
 const SNACKBAR_LONG_MS = 3000;
 
-/** Résumé lisible du bloc véhicule/conduite d'un pax pour l'annuaire. */
-export function describeVehicleInfo(pax: PaxOverview): string {
-  const parts: string[] = [];
-  if (pax.hasVehicle === true) {
-    parts.push("a une voiture");
-    if (pax.vehicleLendingMode === VehicleLendingMode.AVAILABLE_ANY_DRIVER) {
-      parts.push("prête même si iel ne conduit pas");
-    } else if (pax.vehicleLendingMode === VehicleLendingMode.ONLY_IF_OWNER_DRIVES) {
-      parts.push("prête seulement si iel conduit");
-    }
-  } else if (pax.hasVehicle === false && pax.hasDrivingLicense) {
-    parts.push("a le permis");
-  }
-  if (pax.hasVehicle !== null && pax.willingToDriveShuttle) {
-    parts.push("partant·e pour conduire");
-  }
-  return parts.length > 0 ? parts.join(", ") : "—";
-}
-
 /**
  * "Mon espace" : l'écran personnel d'un pax, accessible par son lien
- * (jeton dans l'URL). Il y voit le planning des navettes, les autres paxs,
- * tous les trajets, et modifie ses infos / ses trajets / ses disponibilités.
+ * (jeton dans l'URL). Il y modifie ses infos, sa voiture, ses trajets
+ * aller/retour et ses disponibilités pour conduire. Les tableaux de
+ * l'évènement sont sur une page à part.
  */
 @Component({
   selector: "app-my-space",
   standalone: true,
   imports: [
     DatePipe,
+    RouterLink,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule,
     MatButtonModule,
     MatIconModule,
+    MatRadioModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
-    MatTableModule,
+    TripFormComponent,
+    CarFormComponent,
     ...LABEL_PIPES,
   ],
   templateUrl: "./my-space.component.html",
@@ -94,32 +75,49 @@ export function describeVehicleInfo(pax: PaxOverview): string {
 export class MySpaceComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly paxApi = inject(PaxApiService);
+  private readonly eventsApi = inject(EventsApiService);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly TransportMode = TransportMode;
   readonly TripStatus = TripStatus;
   readonly directions = DIRECTIONS;
 
-  readonly token = this.route.snapshot.paramMap.get("token")!;
-  readonly personalLink = window.location.href;
+  readonly token = this.route.parent?.snapshot.paramMap.get("token") ?? "";
+  readonly personalLink = `${window.location.origin}/${appLinks.mySpace(this.token).slice(1).join("/")}`;
+  readonly tablesLink = appLinks.paxTables(this.token);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly pax = signal<PaxWithTrips | null>(null);
+  readonly event = signal<EventWithStations | null>(null);
+  readonly stations = signal<Station[]>([]);
+  readonly cars = signal<CarOverview[]>([]);
   readonly savingInfo = signal(false);
   readonly savingTrip = signal<Direction | null>(null);
-
-  readonly shuttles = signal<ShuttleWithPassengerNames[]>([]);
-  readonly shuttleColumns = ["label", "direction", "day", "times", "driver", "seats", "passengers"];
-
-  readonly eventPaxs = signal<PaxOverview[]>([]);
-  readonly paxColumns = ["name", "discord", "vehicle", "comment"];
-
-  readonly eventTrips = signal<TripOverview[]>([]);
-  readonly tripColumns = ["pax", "direction", "mode", "when", "status", "shuttle"];
+  readonly savingCar = signal(false);
+  /** Le pax veut déclarer une voiture (bloc ouvert) même s'il n'en a pas encore en base. */
+  readonly showCarForm = signal(false);
 
   readonly myAvailabilitySlots = signal<DriverAvailabilitySlot[]>([]);
   readonly savingAvailabilitySlot = signal(false);
+
+  readonly tripForms = viewChildren(TripFormComponent);
+  readonly carForm = viewChild(CarFormComponent);
+
+  readonly myCar = computed(() => this.pax()?.car ?? null);
+  readonly isDriverSomewhere = computed(() => this.tripForms().some((form) => form.isDriver()));
+  readonly carSectionVisible = computed(
+    () => !!this.myCar() || this.isDriverSomewhere() || this.showCarForm(),
+  );
+
+  readonly personalInfoForm = new FormGroup({
+    name: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
+    contactEmail: new FormControl("", { nonNullable: true, validators: [Validators.email] }),
+    discordHandle: new FormControl("", { nonNullable: true }),
+    contactPhone: new FormControl("", { nonNullable: true }),
+    comment: new FormControl("", { nonNullable: true }),
+    hasDrivingLicense: new FormControl<boolean | null>(null),
+    willingToDriveShuttle: new FormControl<boolean | null>(null),
+  });
 
   readonly availabilitySlotForm = new FormGroup({
     day: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
@@ -128,20 +126,32 @@ export class MySpaceComponent {
     comment: new FormControl("", { nonNullable: true }),
   });
 
-  readonly personalInfoForm = new FormGroup({
-    name: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    contactEmail: new FormControl("", { nonNullable: true, validators: [Validators.email] }),
-    discordHandle: new FormControl("", { nonNullable: true }),
-    contactPhone: new FormControl("", { nonNullable: true }),
-    comment: new FormControl("", { nonNullable: true }),
-  });
-
-  readonly tripForms: Record<Direction, FormGroup<TripForm>> = {
-    [Direction.OUTBOUND]: createTripForm(),
-    [Direction.RETURN]: createTripForm(),
-  };
+  /** Données chargées en attente d'un formulaire rendu pour les afficher. */
+  private readonly tripsToPatch = signal<PaxWithTrips["trips"] | null>(null);
+  private readonly carToPatch = signal<Car | null>(null);
 
   constructor() {
+    effect(() => {
+      const forms = this.tripForms();
+      const trips = this.tripsToPatch();
+      if (!trips || forms.length === 0) return;
+      untracked(() => {
+        for (const form of forms) {
+          const trip = trips.find((t) => t.direction === form.direction());
+          if (trip) form.patchFrom(trip);
+        }
+        this.tripsToPatch.set(null);
+      });
+    });
+    effect(() => {
+      const form = this.carForm();
+      const car = this.carToPatch();
+      if (!form || !car) return;
+      untracked(() => {
+        form.patchFrom(car);
+        this.carToPatch.set(null);
+      });
+    });
     this.load();
   }
 
@@ -152,6 +162,15 @@ export class MySpaceComponent {
         this.pax.set(pax);
         this.fillForms(pax);
         this.loading.set(false);
+        forkJoin({
+          event: this.eventsApi.get(pax.eventId),
+          cars: this.paxApi.listMyEventCars(this.token).pipe(catchError(() => of([]))),
+        }).subscribe(({ event, cars }) => {
+          this.event.set(event);
+          this.stations.set(event.stations);
+          this.cars.set(cars);
+        });
+        this.loadMyAvailabilitySlots();
       },
       error: () => {
         this.loading.set(false);
@@ -160,23 +179,6 @@ export class MySpaceComponent {
         );
       },
     });
-
-    // Planning des navettes, annuaire des paxs et vue d'ensemble des trajets :
-    // trois chargements indépendants du reste, une erreur sur l'un d'eux ne
-    // doit pas empêcher d'afficher/modifier ses propres infos et trajets.
-    this.paxApi.listMyEventShuttles(this.token).subscribe({
-      next: (shuttles) => this.shuttles.set(shuttles),
-      error: () => this.shuttles.set([]),
-    });
-    this.paxApi.listMyEventPaxs(this.token).subscribe({
-      next: (paxs) => this.eventPaxs.set(paxs),
-      error: () => this.eventPaxs.set([]),
-    });
-    this.paxApi.listMyEventTrips(this.token).subscribe({
-      next: (trips) => this.eventTrips.set(trips),
-      error: () => this.eventTrips.set([]),
-    });
-    this.loadMyAvailabilitySlots();
   }
 
   private fillForms(pax: PaxWithTrips): void {
@@ -186,19 +188,13 @@ export class MySpaceComponent {
       discordHandle: pax.discordHandle ?? "",
       contactPhone: pax.contactPhone ?? "",
       comment: pax.comment ?? "",
+      hasDrivingLicense: pax.hasDrivingLicense,
+      willingToDriveShuttle: pax.willingToDriveShuttle,
     });
-
-    for (const direction of this.directions) {
-      const trip = pax.trips.find((t) => t.direction === direction);
-      if (!trip) continue;
-      this.tripForms[direction].patchValue({
-        mode: trip.mode,
-        day: toDateInputValue(trip.day),
-        time: trip.time ?? "",
-        station: trip.station ?? "",
-        comment: trip.comment ?? "",
-      });
-    }
+    // Les formulaires de trajet et de voiture sont rendus après le chargement :
+    // les `effect` du constructeur les remplissent dès qu'ils apparaissent.
+    this.tripsToPatch.set(pax.trips);
+    this.carToPatch.set(pax.car);
   }
 
   private loadMyAvailabilitySlots(): void {
@@ -212,25 +208,18 @@ export class MySpaceComponent {
     this.snackBar.open(message, undefined, { duration: durationMs });
   }
 
+  private errorMessage(error: unknown, fallback: string): string {
+    return error instanceof HttpErrorResponse && typeof error.error?.message === "string"
+      ? error.error.message
+      : fallback;
+  }
+
   assignedShuttle(direction: Direction): Shuttle | null {
     return this.pax()?.trips.find((t) => t.direction === direction)?.shuttle ?? null;
   }
 
   tripStatus(direction: Direction): TripStatus | null {
     return this.pax()?.trips.find((t) => t.direction === direction)?.status ?? null;
-  }
-
-  /** Pour surligner dans le planning la ou les navettes déjà assignées à ce pax. */
-  isMyShuttle(shuttleId: string): boolean {
-    return (this.pax()?.trips ?? []).some((t) => t.shuttle?.id === shuttleId);
-  }
-
-  passengerNames(passengers: PassengerName[]): string {
-    return passengers.map((p) => p.name).join(", ");
-  }
-
-  describeVehicleInfo(pax: PaxOverview): string {
-    return describeVehicleInfo(pax);
   }
 
   copyPersonalLink(): void {
@@ -253,11 +242,14 @@ export class MySpaceComponent {
         discordHandle: emptyToNull(values.discordHandle),
         contactPhone: emptyToNull(values.contactPhone),
         comment: emptyToNull(values.comment),
+        hasDrivingLicense: values.hasDrivingLicense,
+        willingToDriveShuttle: values.willingToDriveShuttle,
       })
       .subscribe({
         next: () => {
           this.savingInfo.set(false);
           this.notify("Tes infos ont été enregistrées.", SNACKBAR_LONG_MS);
+          this.load();
         },
         error: () => {
           this.savingInfo.set(false);
@@ -266,34 +258,53 @@ export class MySpaceComponent {
       });
   }
 
-  saveTrip(direction: Direction): void {
-    const form = this.tripForms[direction];
-    if (form.invalid) {
-      form.markAllAsTouched();
+  saveCar(): void {
+    const form = this.carForm();
+    if (!form) return;
+    if (form.form.invalid) {
+      form.form.markAllAsTouched();
       return;
     }
-    this.savingTrip.set(direction);
-    const values = form.getRawValue();
+    this.savingCar.set(true);
+    this.paxApi.upsertMyCar(this.token, form.toInput()).subscribe({
+      next: () => {
+        this.savingCar.set(false);
+        this.notify("Voiture enregistrée.");
+        this.paxApi.updateMyInfo(this.token, { hasVehicle: true }).subscribe(() => this.load());
+      },
+      error: () => {
+        this.savingCar.set(false);
+        this.notify("Échec de l'enregistrement, réessaie.", SNACKBAR_LONG_MS);
+      },
+    });
+  }
 
-    this.paxApi
-      .upsertMyTrip(this.token, direction, {
-        mode: values.mode ?? undefined,
-        day: emptyToUndefined(values.day),
-        time: emptyToUndefined(values.time),
-        station: emptyToUndefined(values.station),
-        comment: emptyToUndefined(values.comment),
-      })
-      .subscribe({
-        next: () => {
-          this.savingTrip.set(null);
-          this.notify("Trajet enregistré.", SNACKBAR_LONG_MS);
-          this.load();
-        },
-        error: () => {
-          this.savingTrip.set(null);
-          this.notify("Échec de l'enregistrement, réessaie.", SNACKBAR_LONG_MS);
-        },
-      });
+  deleteCar(): void {
+    this.paxApi.deleteMyCar(this.token).subscribe({
+      next: () => {
+        this.showCarForm.set(false);
+        this.notify("Voiture retirée.");
+        this.load();
+      },
+      error: () => this.notify("Échec, réessaie.", SNACKBAR_LONG_MS),
+    });
+  }
+
+  saveTrip(direction: Direction): void {
+    const form = this.tripForms().find((f) => f.direction() === direction);
+    if (!form) return;
+    this.savingTrip.set(direction);
+    this.paxApi.upsertMyTrip(this.token, direction, form.toInput()).subscribe({
+      next: () => {
+        this.savingTrip.set(null);
+        this.notify("Trajet enregistré.", SNACKBAR_LONG_MS);
+        this.load();
+      },
+      error: (error: unknown) => {
+        this.savingTrip.set(null);
+        this.notify(this.errorMessage(error, "Échec de l'enregistrement, réessaie."), 4000);
+      },
+    });
   }
 
   addAvailabilitySlot(): void {

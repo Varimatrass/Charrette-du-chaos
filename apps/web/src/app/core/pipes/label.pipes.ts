@@ -1,7 +1,16 @@
 import { Pipe, PipeTransform } from "@angular/core";
-import type { Direction, TransportMode, TripStatus, WaitLevel } from "@desordre/shared-types";
+import type {
+  CarpoolRole,
+  Direction,
+  TransportMode,
+  TripStatus,
+  VehicleLendingMode,
+  WaitLevel,
+} from "@desordre/shared-types";
 import {
+  CARPOOL_ROLE_LABELS,
   DIRECTION_LABELS,
+  VEHICLE_LENDING_MODE_LABELS,
   TRANSPORT_MODE_LABELS,
   TRIP_STATUS_LABELS,
   UNKNOWN_LABEL,
@@ -36,7 +45,23 @@ export class WaitLevelLabelPipe implements PipeTransform {
   }
 }
 
+@Pipe({ name: "carpoolRoleLabel", standalone: true })
+export class CarpoolRoleLabelPipe implements PipeTransform {
+  transform(value: CarpoolRole | null | undefined): string {
+    return value ? CARPOOL_ROLE_LABELS[value] : UNKNOWN_LABEL;
+  }
+}
+
+@Pipe({ name: "vehicleLendingModeLabel", standalone: true })
+export class VehicleLendingModeLabelPipe implements PipeTransform {
+  transform(value: VehicleLendingMode | null | undefined): string {
+    return value ? VEHICLE_LENDING_MODE_LABELS[value] : UNKNOWN_LABEL;
+  }
+}
+
 export const LABEL_PIPES = [
+  CarpoolRoleLabelPipe,
+  VehicleLendingModeLabelPipe,
   DirectionLabelPipe,
   TransportModeLabelPipe,
   TripStatusLabelPipe,

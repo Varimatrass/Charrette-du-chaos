@@ -8,17 +8,31 @@ export const APP_PATHS = {
   eventLanding: "e",
   registration: "inscription",
   mySpace: "mon-espace",
+  tables: "tableaux",
   admin: "admin",
   adminLogin: "connexion",
   adminEvents: "events",
+  adminEventConfig: "config",
+  adminEventPaxs: "paxs",
+  adminEventShuttles: "navettes",
+  adminEventTrips: "trajets",
 } as const;
 
 /** Constructeurs de chemins, pour ne jamais recomposer une URL à la main dans un composant. */
 export const appLinks = {
+  home: () => ["/"],
   eventLanding: (eventId: string) => ["/", APP_PATHS.eventLanding, eventId],
   registration: (eventId: string) => ["/", APP_PATHS.eventLanding, eventId, APP_PATHS.registration],
   mySpace: (token: string) => ["/", APP_PATHS.mySpace, token],
+  paxTables: (token: string) => ["/", APP_PATHS.mySpace, token, APP_PATHS.tables],
   admin: () => ["/", APP_PATHS.admin],
   adminLogin: () => ["/", APP_PATHS.admin, APP_PATHS.adminLogin],
   adminEvent: (eventId: string) => ["/", APP_PATHS.admin, APP_PATHS.adminEvents, eventId],
+  adminEventSection: (eventId: string, section: string) => [
+    "/",
+    APP_PATHS.admin,
+    APP_PATHS.adminEvents,
+    eventId,
+    section,
+  ],
 };

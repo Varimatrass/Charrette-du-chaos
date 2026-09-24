@@ -17,16 +17,27 @@ describe("Events (e2e)", () => {
     startDate: "2026-09-18",
     endDate: "2026-09-20",
     location: "Ferme du Chaos",
-    referenceStation: "Gare de Testville",
+    stations: ["Gare de Testville", "Gare du Nord"],
   };
 
   describe("public read", () => {
-    it("lists events, most recent first", async () => {
+    it("lists open events only, most recent first, with their stations", async () => {
       await make.event({ name: "Ancien", startDate: new Date("2025-06-01") });
-      await make.event({ name: "Récent", startDate: new Date("2026-09-18") });
+      const recent = await make.event({ name: "Récent", startDate: new Date("2026-09-18") });
+      await make.station(recent.id, { name: "Gare Z" });
+      await make.event({ name: "Brouillon", openToPaxs: false });
 
       const { body } = await t.http().get("/events").expect(200);
       expect(body.map((e: { name: string }) => e.name)).toEqual(["Récent", "Ancien"]);
+      expect(body[0].stations.map((s: { name: string }) => s.name)).toEqual(["Gare Z"]);
+    });
+
+    it("still serves a draft event by id (direct link) but lists it only for admins", async () => {
+      const draft = await make.event({ name: "Brouillon", openToPaxs: false });
+      await t.http().get(`/events/${draft.id}`).expect(200);
+      await t.http().get("/admin/events").expect(401);
+      const { body } = await t.http().get("/admin/events").set(t.asAdmin).expect(200);
+      expect(body.map((e: { name: string }) => e.name)).toEqual(["Brouillon"]);
     });
 
     it("gets one event by id, 404 for an unknown one, 400 for a malformed id", async () => {
@@ -73,15 +84,36 @@ describe("Events (e2e)", () => {
         .expect(400);
     });
 
-    it("updates only the provided fields", async () => {
-      const event = await make.event();
+    it("updates only the provided fields, including opening the event and the preferred station", async () => {
+      const event = await make.event({ openToPaxs: false });
+      const station = await make.station(event.id);
       const { body } = await t
         .http()
         .patch(`/admin/events/${event.id}`)
         .set(t.asAdmin)
-        .send({ location: "Nouveau lieu" })
+        .send({ location: "Nouveau lieu", openToPaxs: true, preferredStationId: station.id })
         .expect(200);
-      expect(body).toMatchObject({ name: event.name, location: "Nouveau lieu" });
+      expect(body).toMatchObject({
+        name: event.name,
+        location: "Nouveau lieu",
+        openToPaxs: true,
+        preferredStationId: station.id,
+      });
+
+      const other = await make.event({ name: "Autre" });
+      const foreign = await make.station(other.id, { name: "Ailleurs" });
+      await t
+        .http()
+        .patch(`/admin/events/${event.id}`)
+        .set(t.asAdmin)
+        .send({ preferredStationId: foreign.id })
+        .expect(400);
+      await t
+        .http()
+        .patch(`/admin/events/${event.id}`)
+        .set(t.asAdmin)
+        .send({ name: null })
+        .expect(400);
     });
   });
 });

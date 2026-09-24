@@ -19,10 +19,6 @@ export class CreateShuttleDto implements CreateShuttleInput {
 
   @IsOptional()
   @IsString()
-  driverName?: string;
-
-  @IsOptional()
-  @IsString()
   vehicle?: string;
 
   @IsString()

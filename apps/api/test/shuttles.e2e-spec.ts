@@ -32,13 +32,13 @@ describe("Shuttles (e2e)", () => {
       await t.http().post("/admin/shuttles").send(validShuttle()).expect(401);
     });
 
-    it("creates a shuttle, optionally linked to a driver pax", async () => {
+    it("creates a shuttle driven by a pax of the event", async () => {
       const driver = await make.pax(eventId, { name: "Sam" });
       const { body } = await t
         .http()
         .post("/admin/shuttles")
         .set(t.asAdmin)
-        .send({ ...validShuttle(), driverName: "Sam", driverPaxId: driver.id })
+        .send({ ...validShuttle(), driverPaxId: driver.id })
         .expect(201);
       expect(body).toMatchObject({
         label: "Navette gare — matin",
@@ -46,6 +46,21 @@ describe("Shuttles (e2e)", () => {
         driverPaxId: driver.id,
       });
       expect(body.day).toMatch(/^2026-09-18/);
+
+      const other = await make.event({ name: "Autre" });
+      const stranger = await make.pax(other.id, { name: "Inconnu" });
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), driverPaxId: stranger.id })
+        .expect(400);
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), driverName: "Sam" })
+        .expect(400);
     });
 
     it("validates the payload", async () => {
@@ -89,6 +104,9 @@ describe("Shuttles (e2e)", () => {
       const pax = await make.pax(eventId);
       await make.trip(eventId, pax.id, { shuttleId: early.id, status: "ASSIGNED" });
 
+      const driver = await make.pax(eventId, { name: "Sam" });
+      await t.prisma.shuttle.update({ where: { id: late.id }, data: { driverPaxId: driver.id } });
+
       const { body } = await t
         .http()
         .get("/admin/shuttles")
@@ -97,7 +115,9 @@ describe("Shuttles (e2e)", () => {
         .expect(200);
       expect(body.map((s: { id: string }) => s.id)).toEqual([early.id, late.id]);
       expect(body[0].remainingSeats).toBe(1);
+      expect(body[0].driverPax).toBeNull();
       expect(body[1].remainingSeats).toBe(4);
+      expect(body[1].driverPax).toEqual({ id: driver.id, name: "Sam" });
     });
 
     it("gets one shuttle with its passengers (contact details included) and wait levels", async () => {
@@ -183,7 +203,11 @@ describe("Shuttles (e2e)", () => {
 
       const mine = await t.http().get("/pax/me/shuttles").set(t.asPax(me.accessToken)).expect(200);
       const withMe = mine.body.find((s: { id: string }) => s.id === shuttle.id);
-      expect(withMe).toMatchObject({ remainingSeats: 2, driverContactPhone: "0699" });
+      expect(withMe).toMatchObject({
+        remainingSeats: 2,
+        driverContactPhone: "0699",
+        driverPax: { id: driver.id, name: "Sam" },
+      });
       expect(withMe.passengers).toEqual(
         expect.arrayContaining([
           { paxId: me.id, name: "Moi" },

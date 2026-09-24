@@ -1,0 +1,20 @@
+<div [formGroup]="form" class="car-form">
+  <mat-form-field appearance="outline">
+    <mat-label>Un nom pour ta voiture</mat-label>
+    <input matInput formControlName="name" placeholder="Twingo verte, Kangoo de Sam…" required />
+  </mat-form-field>
+  <mat-form-field appearance="outline">
+    <mat-label>Places disponibles pour des passager·es</mat-label>
+    <input matInput type="number" min="0" max="20" formControlName="seats" required />
+  </mat-form-field>
+  <p class="question">Tu accepterais de la prêter pour des navettes gare ↔ lieu ?</p>
+  <mat-radio-group formControlName="lendingMode">
+    <mat-radio-button [value]="VehicleLendingMode.NOT_AVAILABLE">Non</mat-radio-button>
+    <mat-radio-button [value]="VehicleLendingMode.ONLY_IF_OWNER_DRIVES">
+      Oui, mais seulement si c'est moi qui conduis
+    </mat-radio-button>
+    <mat-radio-button [value]="VehicleLendingMode.AVAILABLE_ANY_DRIVER">
+      Oui, même si quelqu'un d'autre conduit
+    </mat-radio-button>
+  </mat-radio-group>
+</div>

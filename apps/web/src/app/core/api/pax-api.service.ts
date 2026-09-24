@@ -2,18 +2,24 @@ import { HttpClient } from "@angular/common/http";
 import { inject, Injectable } from "@angular/core";
 import { Observable } from "rxjs";
 import type {
+  Car,
+  CarOverview,
   CreateDriverAvailabilitySlotInput,
   CreatePaxInput,
+  CreateStationInput,
   Direction,
   DriverAvailabilitySlot,
   Pax,
   PaxOverview,
   PaxSubmissionResult,
   PaxWithTrips,
+  SetMyShuttleInput,
   ShuttleWithPassengerNames,
+  Station,
   Trip,
   TripOverview,
   UpdatePaxInput,
+  UpsertCarInput,
   UpsertTripInput,
 } from "@desordre/shared-types";
 import { apiUrl, paxTokenHeaders } from "./api-base";
@@ -40,6 +46,34 @@ export class PaxApiService {
 
   upsertMyTrip(token: string, direction: Direction, input: UpsertTripInput): Observable<Trip> {
     return this.http.put<Trip>(apiUrl(`pax/me/trips/${direction}`), input, {
+      headers: paxTokenHeaders(token),
+    });
+  }
+
+  /** Se met (ou se retire, `null`) dans une navette non pleine de son évènement, pour son propre trajet. */
+  setMyShuttle(token: string, direction: Direction, input: SetMyShuttleInput): Observable<Trip> {
+    return this.http.patch<Trip>(apiUrl(`pax/me/trips/${direction}/shuttle`), input, {
+      headers: paxTokenHeaders(token),
+    });
+  }
+
+  /** Déclare ou met à jour sa voiture (une seule par pax). */
+  upsertMyCar(token: string, input: UpsertCarInput): Observable<Car> {
+    return this.http.put<Car>(apiUrl("pax/me/car"), input, { headers: paxTokenHeaders(token) });
+  }
+
+  deleteMyCar(token: string): Observable<void> {
+    return this.http.delete<void>(apiUrl("pax/me/car"), { headers: paxTokenHeaders(token) });
+  }
+
+  /** Voitures de son évènement, pour choisir celle où l'on a une place. */
+  listMyEventCars(token: string): Observable<CarOverview[]> {
+    return this.http.get<CarOverview[]>(apiUrl("pax/me/cars"), { headers: paxTokenHeaders(token) });
+  }
+
+  /** Ajoute une gare absente de la liste de son évènement. */
+  addStation(token: string, input: CreateStationInput): Observable<Station> {
+    return this.http.post<Station>(apiUrl("pax/me/stations"), input, {
       headers: paxTokenHeaders(token),
     });
   }

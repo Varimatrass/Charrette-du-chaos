@@ -75,7 +75,7 @@ describe("PaxService", () => {
       expect(result.trips).toEqual([trip]);
       expect(prisma.pax.findUnique).toHaveBeenCalledWith({
         where: { id: pax.id },
-        include: { trips: { include: { shuttle: true } } },
+        include: { car: true, trips: { include: { shuttle: true, station: true, car: true } } },
       });
     });
 
@@ -97,20 +97,22 @@ describe("PaxService", () => {
   });
 
   describe("findAllForEventOverview", () => {
-    it("selects only non-sensitive fields (no email, phone or token)", async () => {
+    it("selects only the name and a trip summary (no email, phone, comment or token)", async () => {
       prisma.pax.findMany.mockResolvedValue([]);
       await service.findAllForEventOverview(EVENT_ID);
-      const call = prisma.pax.findMany.mock.calls[0]?.[0] as { select: Record<string, boolean> };
-      expect(Object.keys(call.select).sort()).toEqual(
+      const call = prisma.pax.findMany.mock.calls[0]?.[0] as {
+        select: { trips: { select: Record<string, boolean> } } & Record<string, unknown>;
+      };
+      expect(Object.keys(call.select).sort()).toEqual(["id", "name", "trips"]);
+      expect(Object.keys(call.select.trips.select).sort()).toEqual(
         [
-          "comment",
-          "discordHandle",
-          "hasDrivingLicense",
-          "hasVehicle",
-          "id",
-          "name",
-          "vehicleLendingMode",
-          "willingToDriveShuttle",
+          "carId",
+          "carpoolRole",
+          "direction",
+          "lookingForCarpool",
+          "mode",
+          "shuttleId",
+          "status",
         ].sort(),
       );
     });

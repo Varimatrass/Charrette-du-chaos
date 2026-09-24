@@ -1,0 +1,73 @@
+.shell {
+  min-height: 100vh;
+}
+
+.sidenav {
+  width: 240px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Colonne pleine hauteur (barre fixée à l'écran) : le bouton de déconnexion reste en bas. */
+.sidenav-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.footer {
+  margin-top: auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+
+  /* Un <button mat-list-item> garde la bordure par défaut du navigateur. */
+  button {
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: start;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem 0.75rem;
+
+  mat-icon {
+    color: var(--mat-sys-primary);
+  }
+}
+
+.brand-title {
+  font-weight: 600;
+}
+
+.brand-subtitle {
+  font-size: 0.8rem;
+  color: rgba(0, 0, 0, 0.6);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.active {
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+}
+
+a.back {
+  color: rgba(0, 0, 0, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+.mobile-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.content {
+  padding: 1.5rem;
+  max-width: 1100px;
+}

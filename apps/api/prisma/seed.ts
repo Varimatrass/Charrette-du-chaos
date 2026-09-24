@@ -13,7 +13,13 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import type { Direction, TransportMode, TripStatus } from "@prisma/client";
+import type {
+  CarpoolRole,
+  Direction,
+  TransportMode,
+  TripStatus,
+  VehicleLendingMode,
+} from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const prisma = new PrismaClient({
@@ -25,6 +31,7 @@ const SEED_EVENT_NAME = "[SEED] Été 2026 — Charrette de test";
 const OUTBOUND_DAY = "2026-09-18"; // vendredi
 const RETURN_DAY = "2026-09-20"; // dimanche
 const STATION = "Gare de Testville";
+const SECONDARY_STATION = "Gare de Petit-Bourg";
 
 interface TripSeed {
   direction: Direction;
@@ -36,6 +43,18 @@ interface TripSeed {
   shuttle?: ShuttleKey;
   status?: TripStatus;
   comment?: string;
+  /** Covoiturage : d'où on part (aller) / où on retourne (retour). */
+  origin?: string;
+  carpoolRole?: CarpoolRole;
+  /** Nom du pax propriétaire de la voiture dans laquelle on monte. */
+  carOf?: string;
+  lookingForCarpool?: boolean;
+}
+
+interface CarSeed {
+  name: string;
+  seats: number;
+  lendingMode: VehicleLendingMode;
 }
 
 interface PaxSeed {
@@ -43,6 +62,9 @@ interface PaxSeed {
   contactEmail?: string;
   contactPhone?: string;
   comment?: string;
+  hasDrivingLicense?: boolean;
+  willingToDriveShuttle?: boolean;
+  car?: CarSeed;
   trips: TripSeed[];
 }
 
@@ -57,7 +79,8 @@ const SHUTTLES: Record<
     label: string;
     day: string;
     direction: Direction;
-    driverName: string;
+    /** Nom du pax conducteur·ice (doit exister dans PAXS). */
+    driver: string;
     vehicle: string;
     departureTime: string;
     stationArrivalTime: string;
@@ -69,7 +92,7 @@ const SHUTTLES: Record<
     label: "Navette gare — matin",
     day: OUTBOUND_DAY,
     direction: "OUTBOUND",
-    driverName: "Sam",
+    driver: "Sam Girard",
     vehicle: "Kangoo blanc",
     departureTime: "08:00",
     stationArrivalTime: "08:25",
@@ -80,7 +103,7 @@ const SHUTTLES: Record<
     label: "Navette gare — après-midi",
     day: OUTBOUND_DAY,
     direction: "OUTBOUND",
-    driverName: "Jo",
+    driver: "Jo Lambert",
     vehicle: "Berlingo",
     departureTime: "14:00",
     stationArrivalTime: "14:25",
@@ -90,7 +113,7 @@ const SHUTTLES: Record<
     label: "Navette retour — matin",
     day: RETURN_DAY,
     direction: "RETURN",
-    driverName: "Sam",
+    driver: "Sam Girard",
     vehicle: "Kangoo blanc",
     departureTime: "09:00",
     stationArrivalTime: "09:25",
@@ -100,7 +123,7 @@ const SHUTTLES: Record<
     label: "Navette retour — soir",
     day: RETURN_DAY,
     direction: "RETURN",
-    driverName: "Alex",
+    driver: "Sam Girard",
     vehicle: "Berlingo",
     departureTime: "17:00",
     stationArrivalTime: "17:25",
@@ -150,7 +173,15 @@ const PAXS: PaxSeed[] = [
         shuttle: "outboundMorning",
         status: "ASSIGNED",
       },
-      { direction: "RETURN", mode: "CARPOOL", day: RETURN_DAY, comment: "Repart avec Fanta." },
+      // Passager d'un covoit déjà trouvé (la voiture de Fanta).
+      {
+        direction: "RETURN",
+        mode: "CARPOOL",
+        day: RETURN_DAY,
+        origin: "Lyon",
+        carpoolRole: "PASSENGER",
+        carOf: "Fanta Camara",
+      },
     ],
   },
   {
@@ -204,9 +235,24 @@ const PAXS: PaxSeed[] = [
   {
     name: "Fanta Camara",
     contactPhone: "0600000006",
+    hasDrivingLicense: true,
+    car: { name: "Clio rouge", seats: 3, lendingMode: "ONLY_IF_OWNER_DRIVES" },
     trips: [
-      { direction: "OUTBOUND", mode: "CARPOOL" },
-      { direction: "RETURN", mode: "CARPOOL", comment: "Ramène Bilal." },
+      // Conductrice : vient de Lyon avec sa voiture, la propose en covoit.
+      {
+        direction: "OUTBOUND",
+        mode: "CARPOOL",
+        day: OUTBOUND_DAY,
+        origin: "Lyon",
+        carpoolRole: "DRIVER",
+      },
+      {
+        direction: "RETURN",
+        mode: "CARPOOL",
+        day: RETURN_DAY,
+        origin: "Lyon",
+        carpoolRole: "DRIVER",
+      },
     ],
   },
   {
@@ -258,6 +304,73 @@ const PAXS: PaxSeed[] = [
     ],
   },
   {
+    name: "Kim Rousseau",
+    trips: [
+      // Cherche un covoit depuis Paris, pas encore trouvé -> visible dans le tableau des paxs.
+      {
+        direction: "OUTBOUND",
+        mode: "CARPOOL",
+        day: OUTBOUND_DAY,
+        origin: "Paris",
+        carpoolRole: "PASSENGER",
+        lookingForCarpool: true,
+      },
+      {
+        direction: "RETURN",
+        mode: "TRAIN",
+        day: RETURN_DAY,
+        time: "16:50",
+        station: SECONDARY_STATION,
+      },
+    ],
+  },
+  // Les deux conducteur·ices des navettes (ils viennent en voiture et la prêtent).
+  {
+    name: "Sam Girard",
+    contactPhone: "0600000011",
+    hasDrivingLicense: true,
+    willingToDriveShuttle: true,
+    car: { name: "Kangoo blanc", seats: 4, lendingMode: "AVAILABLE_ANY_DRIVER" },
+    trips: [
+      {
+        direction: "OUTBOUND",
+        mode: "CARPOOL",
+        day: OUTBOUND_DAY,
+        origin: "Nantes",
+        carpoolRole: "DRIVER",
+      },
+      {
+        direction: "RETURN",
+        mode: "CARPOOL",
+        day: RETURN_DAY,
+        origin: "Nantes",
+        carpoolRole: "DRIVER",
+      },
+    ],
+  },
+  {
+    name: "Jo Lambert",
+    hasDrivingLicense: true,
+    willingToDriveShuttle: true,
+    car: { name: "Berlingo", seats: 4, lendingMode: "ONLY_IF_OWNER_DRIVES" },
+    trips: [
+      {
+        direction: "OUTBOUND",
+        mode: "CARPOOL",
+        day: OUTBOUND_DAY,
+        origin: "Rennes",
+        carpoolRole: "DRIVER",
+      },
+      {
+        direction: "RETURN",
+        mode: "CARPOOL",
+        day: RETURN_DAY,
+        origin: "Rennes",
+        carpoolRole: "DRIVER",
+      },
+    ],
+  },
+  {
     name: "Jules Fontaine",
     contactEmail: "jules.test@example.com",
     comment: "Vient de s'inscrire, n'a pas encore ses horaires.",
@@ -275,26 +388,21 @@ async function main(): Promise<void> {
       startDate: new Date(OUTBOUND_DAY),
       endDate: new Date(RETURN_DAY),
       location: "Ferme du Chaos (lieu de test)",
-      referenceStation: STATION,
+      openToPaxs: true,
+      stations: { create: [{ name: STATION }, { name: SECONDARY_STATION }] },
     },
+    include: { stations: true },
+  });
+  const stationIds = new Map(event.stations.map((station) => [station.name, station.id]));
+  await prisma.event.update({
+    where: { id: event.id },
+    data: { preferredStationId: stationIds.get(STATION) },
   });
 
-  const shuttleIds = {} as Record<ShuttleKey, string>;
-  for (const [key, shuttle] of Object.entries(SHUTTLES) as [
-    ShuttleKey,
-    (typeof SHUTTLES)[ShuttleKey],
-  ][]) {
-    const created = await prisma.shuttle.create({
-      data: {
-        eventId: event.id,
-        ...shuttle,
-        day: new Date(shuttle.day),
-        capacity: 4,
-      },
-    });
-    shuttleIds[key] = created.id;
-  }
-
+  // Les paxs d'abord (sans trajets) : les navettes ont besoin de leur conducteur·ice
+  // et les trajets en covoit de la voiture dans laquelle ils montent.
+  const paxIds = new Map<string, string>();
+  const carIds = new Map<string, string>();
   for (const paxSeed of PAXS) {
     const pax = await prisma.pax.create({
       data: {
@@ -303,29 +411,64 @@ async function main(): Promise<void> {
         contactEmail: paxSeed.contactEmail,
         contactPhone: paxSeed.contactPhone,
         comment: paxSeed.comment,
+        hasDrivingLicense: paxSeed.hasDrivingLicense,
+        willingToDriveShuttle: paxSeed.willingToDriveShuttle,
+        hasVehicle: paxSeed.car !== undefined,
       },
     });
+    paxIds.set(paxSeed.name, pax.id);
+    if (paxSeed.car) {
+      const car = await prisma.car.create({
+        data: { eventId: event.id, ownerPaxId: pax.id, ...paxSeed.car },
+      });
+      carIds.set(paxSeed.name, car.id);
+    }
+  }
 
+  const shuttleIds = {} as Record<ShuttleKey, string>;
+  for (const [key, shuttle] of Object.entries(SHUTTLES) as [
+    ShuttleKey,
+    (typeof SHUTTLES)[ShuttleKey],
+  ][]) {
+    const { driver, ...data } = shuttle;
+    const created = await prisma.shuttle.create({
+      data: {
+        eventId: event.id,
+        ...data,
+        day: new Date(shuttle.day),
+        capacity: 4,
+        driverPaxId: paxIds.get(driver),
+      },
+    });
+    shuttleIds[key] = created.id;
+  }
+
+  for (const paxSeed of PAXS) {
     for (const trip of paxSeed.trips) {
+      const carOwner = trip.carpoolRole === "DRIVER" ? paxSeed.name : trip.carOf;
       await prisma.trip.create({
         data: {
           eventId: event.id,
-          paxId: pax.id,
+          paxId: paxIds.get(paxSeed.name)!,
           direction: trip.direction,
           mode: trip.mode,
           day: trip.day ? new Date(trip.day) : null,
           time: trip.time ?? null,
-          station: trip.station ?? null,
+          stationId: trip.station ? stationIds.get(trip.station) : null,
           shuttleId: trip.shuttle ? shuttleIds[trip.shuttle] : null,
           status: trip.status ?? "PENDING",
           comment: trip.comment ?? null,
+          origin: trip.origin ?? null,
+          carpoolRole: trip.carpoolRole ?? null,
+          carId: carOwner ? carIds.get(carOwner) : null,
+          lookingForCarpool: trip.lookingForCarpool ?? false,
         },
       });
     }
   }
 
   console.log(`Seed OK : évènement "${event.name}" (${event.id})`);
-  console.log(`  - ${PAXS.length} paxs`);
+  console.log(`  - ${PAXS.length} paxs, ${carIds.size} voitures`);
   console.log(`  - ${Object.keys(SHUTTLES).length} navettes (2 aller, 2 retour)`);
   console.log(`  - lien public : /e/${event.id}`);
 }

@@ -30,6 +30,13 @@ enum TripStatus {
   TO_RECHECK
 }
 
+// Rôle d'un pax dans un covoiturage pour un trajet donné : conduit sa propre
+// voiture, ou est passager·e (d'une voiture identifiée ou pas encore).
+enum CarpoolRole {
+  DRIVER
+  PASSENGER
+}
+
 // Nuance du prêt de véhicule pour les navettes : certain·es pax acceptent de
 // prêter leur véhicule uniquement si c'est elleux qui le conduisent (question
 // d'assurance), d'autres l'acceptent même si quelqu'un d'autre conduit.
@@ -40,16 +47,24 @@ enum VehicleLendingMode {
 }
 
 model Event {
-  id               String   @id @default(uuid())
-  name             String
-  startDate        DateTime @map("start_date") @db.Date
-  endDate          DateTime @map("end_date") @db.Date
-  location         String
-  referenceStation String   @map("reference_station")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  name               String
+  startDate          DateTime @map("start_date") @db.Date
+  endDate            DateTime @map("end_date") @db.Date
+  location           String
+  // Tant que l'évènement n'est pas "ouvert", il n'apparaît pas sur la page
+  // d'accueil publique : l'orga le prépare (gares, navettes) avant de le
+  // proposer aux paxs. Le lien direct /e/<id> reste utilisable pour tester.
+  openToPaxs         Boolean  @default(false) @map("open_to_paxs")
+  // Gare de référence pour les navettes, parmi les gares de l'évènement.
+  preferredStationId String?  @map("preferred_station_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
+  preferredStation        Station?                 @relation("EventPreferredStation", fields: [preferredStationId], references: [id], onDelete: SetNull)
+  stations                Station[]                @relation("EventStations")
   paxs                    Pax[]
+  cars                    Car[]
   shuttles                Shuttle[]
   trips                   Trip[]
   driverAvailabilitySlots DriverAvailabilitySlot[]
@@ -57,31 +72,73 @@ model Event {
   @@map("events")
 }
 
+// Gare connue pour un évènement. Créée par l'orga (page de configuration)
+// ou à la volée par un pax qui renseigne une gare absente de la liste.
+model Station {
+  id        String   @id @default(uuid())
+  eventId   String   @map("event_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  event              Event   @relation("EventStations", fields: [eventId], references: [id], onDelete: Cascade)
+  preferredForEvents Event[] @relation("EventPreferredStation")
+  trips              Trip[]
+
+  @@unique([eventId, name])
+  @@index([eventId])
+  @@map("stations")
+}
+
+// Voiture d'un pax venant en covoiturage : au plus une par pax et par
+// évènement. Les autres paxs peuvent s'y déclarer passager·es, et l'orga
+// peut l'utiliser pour une navette selon `lendingMode`.
+model Car {
+  id          String             @id @default(uuid())
+  eventId     String             @map("event_id")
+  ownerPaxId  String             @unique @map("owner_pax_id")
+  name        String
+  // Places disponibles pour des passager·es (hors conducteur·ice).
+  seats       Int
+  lendingMode VehicleLendingMode @default(NOT_AVAILABLE) @map("lending_mode")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ownerPax Pax    @relation(fields: [ownerPaxId], references: [id], onDelete: Cascade)
+  trips    Trip[]
+
+  @@index([eventId])
+  @@map("cars")
+}
+
 model Pax {
-  id                    String              @id @default(uuid())
-  eventId               String              @map("event_id")
+  id                    String   @id @default(uuid())
+  eventId               String   @map("event_id")
   name                  String
-  contactEmail          String?             @map("contact_email")
-  contactPhone          String?             @map("contact_phone")
-  discordHandle         String?             @map("discord_handle")
+  contactEmail          String?  @map("contact_email")
+  contactPhone          String?  @map("contact_phone")
+  discordHandle         String?  @map("discord_handle")
   comment               String?
   // Bloc véhicule/conduite (parcours d'inscription v2) : tout reste nullable
   // car non renseigné au départ pour les pax existants, et parce que "pas
   // encore répondu" doit rester distinct de "non" pour l'organisation.
-  hasVehicle            Boolean?            @map("has_vehicle")
-  vehicleLendingMode    VehicleLendingMode? @map("vehicle_lending_mode")
-  hasDrivingLicense     Boolean?            @map("has_driving_license")
-  willingToDriveShuttle Boolean?            @map("willing_to_drive_shuttle")
+  // Les détails de la voiture (nom, places, prêt pour navettes) vivent sur
+  // `Car` depuis l'arrivée du covoiturage.
+  hasVehicle            Boolean? @map("has_vehicle")
+  hasDrivingLicense     Boolean? @map("has_driving_license")
+  willingToDriveShuttle Boolean? @map("willing_to_drive_shuttle")
   // Jeton d'accès personnel non devinable : c'est ce qui permet à un pax
   // de revenir modifier ses infos sans compte. Ne jamais l'exposer dans les
   // vues publiques/listes, seulement dans la réponse de création et le
   // back-office organisateur·ice.
-  accessToken           String              @unique @default(uuid()) @map("access_token")
-  createdAt             DateTime            @default(now()) @map("created_at")
-  updatedAt             DateTime            @updatedAt @map("updated_at")
+  accessToken           String   @unique @default(uuid()) @map("access_token")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   event                   Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   trips                   Trip[]
+  car                     Car?
   driverAvailabilitySlots DriverAvailabilitySlot[]
   // Navettes dont ce pax est le/la conducteur·ice identifié·e (voir
   // Shuttle.driverPaxId) : permet d'aller chercher son contactPhone pour
@@ -99,13 +156,6 @@ model Shuttle {
   label              String
   day                DateTime  @db.Date
   direction          Direction
-  // Nom affiché du/de la conducteur·ice, texte libre : reste utilisable
-  // tel quel pour un·e conducteur·ice qui n'est pas inscrit·e comme pax
-  // (ex: un·e proche qui vient juste déposer/récupérer sans participer à
-  // l'évènement). Quand `driverPaxId` est renseigné, l'admin garde la main
-  // pour le faire correspondre au nom du pax, mais rien ne les lie en base
-  // à part ce champ texte + la relation ci-dessous.
-  driverName         String?   @map("driver_name")
   vehicle            String?
   departureTime      String    @map("departure_time") // "HH:mm"
   stationArrivalTime String    @map("station_arrival_time") // "HH:mm"
@@ -131,32 +181,45 @@ model Shuttle {
 }
 
 model Trip {
-  id        String         @id @default(uuid())
-  eventId   String         @map("event_id")
-  paxId     String         @map("pax_id")
-  direction Direction
+  id                String         @id @default(uuid())
+  eventId           String         @map("event_id")
+  paxId             String         @map("pax_id")
+  direction         Direction
   // Nullable : à l'inscription, le mode de transport peut être "pas encore
   // décidé" (ex: arrivée en train, retour indécis) — le pax pourra revenir
   // le préciser plus tard, comme le reste du trajet.
-  mode      TransportMode?
-  day       DateTime?      @db.Date
-  time      String? // "HH:mm"
-  station   String?
-  shuttleId String?        @map("shuttle_id")
-  status    TripStatus     @default(PENDING)
-  comment   String?
-  createdAt DateTime       @default(now()) @map("created_at")
-  updatedAt DateTime       @updatedAt @map("updated_at")
+  mode              TransportMode?
+  day               DateTime?      @db.Date
+  time              String? // "HH:mm"
+  // Train : gare d'arrivée (aller) / de départ (retour), parmi les gares de
+  // l'évènement.
+  stationId         String?        @map("station_id")
+  shuttleId         String?        @map("shuttle_id")
+  status            TripStatus     @default(PENDING)
+  // Covoiturage : d'où le pax part (aller) / où iel rentre (retour), texte libre.
+  origin            String?
+  carpoolRole       CarpoolRole?   @map("carpool_role")
+  // Voiture concernée : la sienne si DRIVER, celle dans laquelle iel a une
+  // place si PASSENGER. `null` + `lookingForCarpool` = cherche encore.
+  carId             String?        @map("car_id")
+  lookingForCarpool Boolean        @default(false) @map("looking_for_carpool")
+  comment           String?
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
   event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
   shuttle Shuttle? @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
+  station Station? @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  car     Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
 
   // Un pax n'a qu'un seul trajet par direction (aller / retour) et par
   // évènement. Il reste librement modifiable, jamais dupliqué.
   @@unique([paxId, direction])
   @@index([eventId])
   @@index([shuttleId])
+  @@index([stationId])
+  @@index([carId])
   @@map("trips")
 }
 

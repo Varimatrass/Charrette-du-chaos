@@ -1,5 +1,5 @@
 import { HttpInterceptorFn } from "@angular/common/http";
-import { inject } from "@angular/core";
+import { inject, untracked } from "@angular/core";
 import { ADMIN_KEY_HEADER, ADMIN_URL_SEGMENT } from "../api/api-base";
 import { AdminAuthService } from "../services/admin-auth.service";
 
@@ -9,7 +9,10 @@ export const adminKeyInterceptor: HttpInterceptorFn = (req, next) => {
     return next(req);
   }
 
-  const key = inject(AdminAuthService).key();
+  // `untracked` : une requête lancée depuis un `effect()` (les tableaux) ne doit
+  // pas faire de la clé une dépendance de cet effect, sinon se déconnecter
+  // relancerait tous les chargements, sans clé, et donc en 401.
+  const key = untracked(inject(AdminAuthService).key);
   if (!key) {
     return next(req);
   }

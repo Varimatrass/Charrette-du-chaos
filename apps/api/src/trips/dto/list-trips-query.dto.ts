@@ -1,7 +1,7 @@
 import { IsIn, IsOptional, IsUUID } from "class-validator";
-import { TripStatus } from "@desordre/shared-types";
+import { Direction, TripStatus } from "@desordre/shared-types";
 
-/** Query string de GET /admin/trips : évènement obligatoire, filtre de statut facultatif. */
+/** Query string de GET /admin/trips : évènement obligatoire, filtres facultatifs. */
 export class ListTripsQueryDto {
   @IsUUID()
   eventId!: string;
@@ -9,4 +9,8 @@ export class ListTripsQueryDto {
   @IsOptional()
   @IsIn(Object.values(TripStatus))
   status?: TripStatus;
+
+  @IsOptional()
+  @IsIn(Object.values(Direction))
+  direction?: Direction;
 }
