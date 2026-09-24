@@ -4,6 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router } from "@angular/router";
 import { filter, map, startWith } from "rxjs";
 import { EventsApiService } from "../../core/api/events-api.service";
 import { APP_PATHS, appLinks } from "../../core/app-paths";
+import { AdminAuthService } from "../../core/services/admin-auth.service";
 import { AppShellComponent, ShellLink } from "../../shared/shell/app-shell.component";
 
 /**
@@ -20,12 +21,15 @@ import { AppShellComponent, ShellLink } from "../../shared/shell/app-shell.compo
     [subtitle]="eventName()"
     [links]="links()"
     [backLink]="backLink()"
+    [showLogout]="true"
+    (logout)="logout()"
   />`,
 })
 export class AdminShellComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly eventsApi = inject(EventsApiService);
+  private readonly adminAuth = inject(AdminAuthService);
 
   /** Id de l'évènement de la route enfant active, s'il y en a un. */
   private readonly eventId = toSignal(
@@ -56,6 +60,12 @@ export class AdminShellComponent {
       { label: "Trajets", icon: "route", link: section(APP_PATHS.adminEventTrips) },
     ];
   });
+
+  /** Oublie la clé organisateur·ice mémorisée dans ce navigateur et revient à l'accueil. */
+  logout(): void {
+    this.adminAuth.clear();
+    void this.router.navigate(appLinks.home());
+  }
 
   constructor() {
     let loadedFor: string | null = null;

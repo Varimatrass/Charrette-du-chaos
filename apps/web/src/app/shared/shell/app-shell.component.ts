@@ -1,5 +1,5 @@
 import { BreakpointObserver, Breakpoints } from "@angular/cdk/layout";
-import { Component, inject, input, signal } from "@angular/core";
+import { Component, inject, input, output, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
@@ -47,6 +47,9 @@ export class AppShellComponent {
   readonly links = input.required<ShellLink[]>();
   /** Lien "retour" affiché au-dessus des entrées (ex: revenir à la liste des évènements). */
   readonly backLink = input<ShellLink | null>(null);
+  /** Affiche un bouton "Se déconnecter" en bas de la barre, qui émet `logout`. */
+  readonly showLogout = input(false);
+  readonly logout = output<void>();
 
   readonly isHandset = toSignal(
     this.breakpoints

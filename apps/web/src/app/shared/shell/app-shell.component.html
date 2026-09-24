@@ -3,38 +3,49 @@
     class="sidenav"
     [mode]="isHandset() ? 'over' : 'side'"
     [opened]="isHandset() ? opened() : true"
-    [fixedInViewport]="isHandset()"
+    [fixedInViewport]="true"
   >
-    <div class="brand">
-      <mat-icon>airport_shuttle</mat-icon>
-      <div>
-        <div class="brand-title">{{ title() }}</div>
-        @if (subtitle()) {
-          <div class="brand-subtitle">{{ subtitle() }}</div>
-        }
+    <div class="sidenav-body">
+      <div class="brand">
+        <mat-icon>airport_shuttle</mat-icon>
+        <div>
+          <div class="brand-title">{{ title() }}</div>
+          @if (subtitle()) {
+            <div class="brand-subtitle">{{ subtitle() }}</div>
+          }
+        </div>
       </div>
-    </div>
 
-    <mat-nav-list>
-      @if (backLink(); as back) {
-        <a mat-list-item [routerLink]="back.link" (click)="onNavigate()" class="back">
-          <mat-icon matListItemIcon>{{ back.icon }}</mat-icon>
-          <span matListItemTitle>{{ back.label }}</span>
-        </a>
+      <mat-nav-list>
+        @if (backLink(); as back) {
+          <a mat-list-item [routerLink]="back.link" (click)="onNavigate()" class="back">
+            <mat-icon matListItemIcon>{{ back.icon }}</mat-icon>
+            <span matListItemTitle>{{ back.label }}</span>
+          </a>
+        }
+        @for (item of links(); track item.label) {
+          <a
+            mat-list-item
+            [routerLink]="item.link"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+            (click)="onNavigate()"
+          >
+            <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+            <span matListItemTitle>{{ item.label }}</span>
+          </a>
+        }
+      </mat-nav-list>
+
+      @if (showLogout()) {
+        <mat-nav-list class="footer">
+          <button mat-list-item type="button" (click)="logout.emit()">
+            <mat-icon matListItemIcon>logout</mat-icon>
+            <span matListItemTitle>Se déconnecter</span>
+          </button>
+        </mat-nav-list>
       }
-      @for (item of links(); track item.label) {
-        <a
-          mat-list-item
-          [routerLink]="item.link"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-          (click)="onNavigate()"
-        >
-          <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}</span>
-        </a>
-      }
-    </mat-nav-list>
+    </div>
   </mat-sidenav>
 
   <mat-sidenav-content>
