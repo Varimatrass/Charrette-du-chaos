@@ -26,12 +26,17 @@ describe("StationsService", () => {
       expect(prisma.station.create).not.toHaveBeenCalled();
     });
 
-    it("creates the station otherwise", async () => {
+    it("creates the station otherwise, without failing if someone created it meanwhile", async () => {
+      const created = makeStation({ name: "Nouvelle" });
       prisma.station.findUnique.mockResolvedValue(null);
-      prisma.station.create.mockResolvedValue(makeStation({ name: "Nouvelle" }));
-      await service.findOrCreate(EVENT_ID, "Nouvelle");
-      expect(prisma.station.create).toHaveBeenCalledWith({
-        data: { eventId: EVENT_ID, name: "Nouvelle" },
+      prisma.station.findUniqueOrThrow.mockResolvedValue(created);
+      expect(await service.findOrCreate(EVENT_ID, "Nouvelle")).toBe(created);
+      expect(prisma.station.createMany).toHaveBeenCalledWith({
+        data: [{ eventId: EVENT_ID, name: "Nouvelle" }],
+        skipDuplicates: true,
+      });
+      expect(prisma.station.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { eventId_name: { eventId: EVENT_ID, name: "Nouvelle" } },
       });
     });
 

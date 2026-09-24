@@ -72,6 +72,24 @@ describe("Stations (e2e)", () => {
     expect(trip.stationId).toBeNull();
   });
 
+  it("gives the same station to paxs typing the same new name at once", async () => {
+    const paxs = await Promise.all(["A", "B", "C", "D"].map((name) => make.pax(eventId, { name })));
+    const responses = await Promise.all(
+      paxs.map((pax, i) =>
+        t
+          .http()
+          .put("/pax/me/trips/OUTBOUND")
+          .set(t.asPax(pax.accessToken))
+          // Variantes d'espaces : toutes normalisées vers le même nom.
+          .send({ mode: "TRAIN", stationName: i % 2 ? " Gare  Neuve " : "Gare Neuve" }),
+      ),
+    );
+    expect(responses.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+    const stations = await t.prisma.station.findMany({ where: { eventId, name: "Gare Neuve" } });
+    expect(stations).toHaveLength(1);
+    expect(new Set(responses.map((r) => r.body.stationId))).toEqual(new Set([stations[0].id]));
+  });
+
   it("lets a pax add a station to their own event", async () => {
     const pax = await make.pax(eventId);
     const { body } = await t

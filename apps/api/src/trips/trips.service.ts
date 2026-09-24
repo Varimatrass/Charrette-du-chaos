@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Pax, Trip } from "@prisma/client";
+import type { Pax, Prisma, Trip } from "@prisma/client";
 import { CarpoolRole, Direction, TransportMode, TripStatus } from "@desordre/shared-types";
 import { toDateOrNull } from "../common/utils/dates.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
@@ -56,36 +56,40 @@ export class TripsService {
    * le retour plus tard, changer d'avis à la dernière minute...
    */
   async upsertMine(pax: Pax, direction: Direction, dto: UpsertTripDto): Promise<Trip> {
-    const existing = await this.prisma.trip.findUnique({
-      where: { paxId_direction: { paxId: pax.id, direction } },
-    });
-
-    // `undefined` -> `null` explicite : "pas encore décidé" doit être écrit
-    // en base, pas juste omis (sinon un update ne pourrait jamais revenir
-    // à "pas décidé" après avoir été renseigné une première fois).
-    const fields = {
-      mode: dto.mode ?? null,
-      day: toDateOrNull(dto.day) ?? null,
-      time: dto.time ?? null,
-      comment: dto.comment ?? null,
-      ...(await this.resolveModeFields(pax, direction, dto)),
-    };
-
-    if (!existing) {
-      return this.prisma.trip.create({
-        data: {
-          ...fields,
-          direction,
-          eventId: pax.eventId,
-          paxId: pax.id,
-          status: TripStatus.PENDING,
-        },
+    // Transaction : la vérification des places d'une voiture (verrou sur sa
+    // ligne) et l'écriture du trajet doivent être atomiques.
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.trip.findUnique({
+        where: { paxId_direction: { paxId: pax.id, direction } },
       });
-    }
 
-    return this.prisma.trip.update({
-      where: { id: existing.id },
-      data: { ...fields, status: statusAfterPaxEdit(existing.status) },
+      // `undefined` -> `null` explicite : "pas encore décidé" doit être écrit
+      // en base, pas juste omis (sinon un update ne pourrait jamais revenir
+      // à "pas décidé" après avoir été renseigné une première fois).
+      const fields = {
+        mode: dto.mode ?? null,
+        day: toDateOrNull(dto.day) ?? null,
+        time: dto.time ?? null,
+        comment: dto.comment ?? null,
+        ...(await this.resolveModeFields(tx, pax, direction, dto)),
+      };
+
+      if (!existing) {
+        return tx.trip.create({
+          data: {
+            ...fields,
+            direction,
+            eventId: pax.eventId,
+            paxId: pax.id,
+            status: TripStatus.PENDING,
+          },
+        });
+      }
+
+      return tx.trip.update({
+        where: { id: existing.id },
+        data: { ...fields, status: statusAfterPaxEdit(existing.status) },
+      });
     });
   }
 
@@ -96,6 +100,7 @@ export class TripsService {
    * après être passé·e en covoit).
    */
   private async resolveModeFields(
+    tx: Prisma.TransactionClient,
     pax: Pax,
     direction: Direction,
     dto: UpsertTripDto,
@@ -103,9 +108,9 @@ export class TripsService {
     if (dto.mode === TransportMode.TRAIN) {
       let stationId: string | null = null;
       if (dto.stationName?.trim()) {
-        stationId = (await this.stationsService.findOrCreate(pax.eventId, dto.stationName)).id;
+        stationId = (await this.stationsService.findOrCreate(pax.eventId, dto.stationName, tx)).id;
       } else if (dto.stationId) {
-        stationId = (await this.stationsService.ensureInEvent(pax.eventId, dto.stationId)).id;
+        stationId = (await this.stationsService.ensureInEvent(pax.eventId, dto.stationId, tx)).id;
       }
       return { ...EMPTY_MODE_FIELDS, stationId };
     }
@@ -113,7 +118,7 @@ export class TripsService {
     if (dto.mode === TransportMode.CARPOOL) {
       const origin = dto.origin?.trim() || null;
       if (dto.carpoolRole === CarpoolRole.DRIVER) {
-        const car = await this.prisma.car.findUnique({ where: { ownerPaxId: pax.id } });
+        const car = await tx.car.findUnique({ where: { ownerPaxId: pax.id } });
         if (!car) {
           throw new BadRequestException("Déclare d'abord ta voiture pour conduire en covoit");
         }
@@ -127,7 +132,7 @@ export class TripsService {
       }
       if (dto.carpoolRole === CarpoolRole.PASSENGER) {
         if (dto.carId) {
-          await this.carsService.ensureSeatAvailable(pax, dto.carId, direction);
+          await this.carsService.ensureSeatAvailable(pax, dto.carId, direction, tx);
           return {
             stationId: null,
             origin,
@@ -169,19 +174,25 @@ export class TripsService {
       });
     }
 
-    const shuttle = await this.shuttlesService.findOneWithSeats(dto.shuttleId);
-    if (!shuttle || shuttle.eventId !== pax.eventId) {
-      throw new BadRequestException("Cette navette n'existe pas dans cet évènement");
-    }
-    if (shuttle.direction !== direction) {
-      throw new BadRequestException("Cette navette ne va pas dans le bon sens");
-    }
-    if (trip.shuttleId !== shuttle.id && shuttle.remainingSeats <= 0) {
-      throw new BadRequestException("Cette navette est pleine");
-    }
-    return this.prisma.trip.update({
-      where: { id: trip.id },
-      data: { shuttleId: shuttle.id, status: TripStatus.ASSIGNED },
+    const shuttleId = dto.shuttleId;
+    // Transaction + verrou sur la navette : deux paxs qui visent la dernière
+    // place passent l'un après l'autre, le/la second·e la voit pleine.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM shuttles WHERE id = ${shuttleId} FOR UPDATE`;
+      const shuttle = await this.shuttlesService.findOneWithSeats(shuttleId, tx);
+      if (!shuttle || shuttle.eventId !== pax.eventId) {
+        throw new BadRequestException("Cette navette n'existe pas dans cet évènement");
+      }
+      if (shuttle.direction !== direction) {
+        throw new BadRequestException("Cette navette ne va pas dans le bon sens");
+      }
+      if (trip.shuttleId !== shuttle.id && shuttle.remainingSeats <= 0) {
+        throw new BadRequestException("Cette navette est pleine");
+      }
+      return tx.trip.update({
+        where: { id: trip.id },
+        data: { shuttleId: shuttle.id, status: TripStatus.ASSIGNED },
+      });
     });
   }
 

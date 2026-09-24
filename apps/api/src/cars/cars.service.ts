@@ -82,9 +82,20 @@ export class CarsService {
    * Vérifie qu'un pax peut se déclarer passager·e de cette voiture pour cette
    * direction : même évènement, pas sa propre voiture, et une place libre
    * (ou déjà dedans).
+   *
+   * À appeler dans la transaction qui écrit ensuite le trajet (`db`) : la
+   * ligne de la voiture est verrouillée (FOR UPDATE) jusqu'à la fin de
+   * celle-ci, donc deux paxs qui visent la dernière place passent l'un après
+   * l'autre et le/la second·e voit la voiture pleine.
    */
-  async ensureSeatAvailable(pax: Pax, carId: string, direction: Direction): Promise<Car> {
-    const car = await this.prisma.car.findUnique({
+  async ensureSeatAvailable(
+    pax: Pax,
+    carId: string,
+    direction: Direction,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<Car> {
+    await db.$queryRaw`SELECT id FROM cars WHERE id = ${carId} FOR UPDATE`;
+    const car = await db.car.findUnique({
       where: { id: carId },
       include: OVERVIEW_INCLUDE,
     });

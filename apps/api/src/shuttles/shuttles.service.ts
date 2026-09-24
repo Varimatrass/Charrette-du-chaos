@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Shuttle } from "@prisma/client";
+import type { Prisma, Shuttle } from "@prisma/client";
 import { toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
@@ -45,8 +45,8 @@ export class ShuttlesService {
   }
 
   /** Une navette avec ses places restantes, ou `null` — pour les contrôles d'assignation. */
-  async findOneWithSeats(id: string) {
-    const shuttle = await this.prisma.shuttle.findUnique({
+  async findOneWithSeats(id: string, db: Prisma.TransactionClient = this.prisma) {
+    const shuttle = await db.shuttle.findUnique({
       where: { id },
       include: { _count: { select: { trips: true } } },
     });

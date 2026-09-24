@@ -167,6 +167,26 @@ describe("Trips (e2e)", () => {
       });
     });
 
+    it("never overbooks a car when several paxs take the last seat at once", async () => {
+      const driver = await make.pax(eventId, { name: "Bilal" });
+      const car = await make.car(eventId, driver.id, { seats: 1 });
+      const paxs = await Promise.all(
+        ["A", "B", "C", "D", "E"].map((name) => make.pax(eventId, { name })),
+      );
+
+      const responses = await Promise.all(
+        paxs.map((pax) =>
+          t
+            .http()
+            .put("/pax/me/trips/OUTBOUND")
+            .set(t.asPax(pax.accessToken))
+            .send({ mode: "CARPOOL", carpoolRole: "PASSENGER", carId: car.id }),
+        ),
+      );
+      expect(responses.map((r) => r.status).sort()).toEqual([200, 400, 400, 400, 400]);
+      expect(await t.prisma.trip.count({ where: { carId: car.id } })).toBe(1);
+    });
+
     it("a passenger picks a car with a free seat, or is looking for one", async () => {
       const driver = await make.pax(eventId, { name: "Bilal" });
       const car = await make.car(eventId, driver.id, { seats: 1 });
@@ -280,6 +300,36 @@ describe("Trips (e2e)", () => {
         .send({ shuttleId: null })
         .expect(200);
       expect(left.body).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("never overbooks a shuttle when several paxs take the last seat at once", async () => {
+      const shuttle = await make.shuttle(eventId, { capacity: 1 });
+      const paxs = await Promise.all(
+        ["A", "B", "C", "D", "E"].map((name) => make.pax(eventId, { name })),
+      );
+      await Promise.all(paxs.map((pax) => make.trip(eventId, pax.id)));
+
+      const responses = await Promise.all(
+        paxs.map((pax) =>
+          t
+            .http()
+            .patch("/pax/me/trips/OUTBOUND/shuttle")
+            .set(t.asPax(pax.accessToken))
+            .send({ shuttleId: shuttle.id }),
+        ),
+      );
+      expect(responses.map((r) => r.status).sort()).toEqual([200, 400, 400, 400, 400]);
+      expect(await t.prisma.trip.count({ where: { shuttleId: shuttle.id } })).toBe(1);
+    });
+
+    it("rejects a body without shuttleId (null is required to leave)", async () => {
+      await make.trip(eventId, paxId);
+      await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({})
+        .expect(400);
     });
 
     it("refuses the wrong direction, another event's shuttle, and a trip not yet filled in", async () => {
@@ -409,6 +459,7 @@ describe("Trips (e2e)", () => {
         .set(t.asAdmin)
         .send({ shuttleId: "nope" })
         .expect(400);
+      await t.http().patch(`/admin/trips/${trip.id}/assign`).set(t.asAdmin).send({}).expect(400);
       await t
         .http()
         .patch("/admin/trips/11111111-1111-4111-8111-111111111111/assign")

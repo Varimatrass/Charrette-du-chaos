@@ -122,7 +122,7 @@ describe("TripsService", () => {
         prisma.trip.findUnique.mockResolvedValue(null);
         prisma.trip.create.mockResolvedValue(makeTrip());
         prisma.station.findUnique.mockResolvedValue(null);
-        prisma.station.create.mockResolvedValue(
+        prisma.station.findUniqueOrThrow.mockResolvedValue(
           makeStation({ id: "new-station", name: "Gare Neuve" }),
         );
 
@@ -131,8 +131,9 @@ describe("TripsService", () => {
           stationName: "Gare Neuve",
         });
 
-        expect(prisma.station.create).toHaveBeenCalledWith({
-          data: { eventId: pax.eventId, name: "Gare Neuve" },
+        expect(prisma.station.createMany).toHaveBeenCalledWith({
+          data: [{ eventId: pax.eventId, name: "Gare Neuve" }],
+          skipDuplicates: true,
         });
         expect(prisma.trip.create).toHaveBeenCalledWith(
           expect.objectContaining({ data: expect.objectContaining({ stationId: "new-station" }) }),
@@ -191,7 +192,9 @@ describe("TripsService", () => {
           carpoolRole: CarpoolRole.PASSENGER,
           carId: CAR_ID,
         });
-        expect(spy).toHaveBeenCalledWith(pax, CAR_ID, Direction.RETURN);
+        // Dans la transaction qui écrit le trajet, pour que le contrôle tienne.
+        expect(prisma.$transaction).toHaveBeenCalled();
+        expect(spy).toHaveBeenCalledWith(pax, CAR_ID, Direction.RETURN, prisma);
         expect(prisma.trip.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
@@ -249,6 +252,9 @@ describe("TripsService", () => {
       prisma.shuttle.findUnique.mockResolvedValue(shuttleWithSeats(1));
       prisma.trip.update.mockResolvedValue(makeTrip({ shuttleId: SHUTTLE_ID }));
       await service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: SHUTTLE_ID });
+      // Le comptage des places se fait sous verrou de la navette, dans la transaction.
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalledBefore(prisma.shuttle.findUnique);
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
         data: { shuttleId: SHUTTLE_ID, status: TripStatus.ASSIGNED },

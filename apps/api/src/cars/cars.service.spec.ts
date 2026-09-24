@@ -75,6 +75,8 @@ describe("CarsService", () => {
     it("accepts a car of the event with a free seat", async () => {
       prisma.car.findUnique.mockResolvedValue(carWithTrips(2));
       await expect(service.ensureSeatAvailable(pax, CAR_ID, "OUTBOUND")).resolves.toBeDefined();
+      // La ligne de la voiture est verrouillée avant de compter les places.
+      expect(prisma.$queryRaw).toHaveBeenCalledBefore(prisma.car.findUnique);
     });
 
     it("rejects a full car, unless the pax is already in it", async () => {
