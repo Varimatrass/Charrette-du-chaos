@@ -186,6 +186,64 @@ describe("Shuttles (e2e)", () => {
     });
   });
 
+  describe("PATCH /admin/shuttles/:id with passengers (B5)", () => {
+    it("answers 409 with the incompatible passengers, then removes them once confirmed", async () => {
+      const shuttle = await make.shuttle(eventId, { capacity: 3 });
+      const names = ["Alix", "Bilal", "Kim"];
+      const trips = [];
+      for (const [index, name] of names.entries()) {
+        const pax = await make.pax(eventId, { name });
+        trips.push(
+          await make.trip(eventId, pax.id, {
+            shuttleId: shuttle.id,
+            status: "ASSIGNED",
+            shuttleAssignedAt: new Date(Date.UTC(2026, 8, 1 + index)),
+          }),
+        );
+      }
+
+      const conflict = await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ capacity: 1, label: "Plus petite" })
+        .expect(409);
+      expect(conflict.body.incompatible).toEqual([
+        { tripId: trips[2]!.id, paxName: "Kim", reason: "CAPACITY" },
+        { tripId: trips[1]!.id, paxName: "Bilal", reason: "CAPACITY" },
+      ]);
+      // Rien n'a été enregistré.
+      expect(
+        (await t.prisma.shuttle.findUniqueOrThrow({ where: { id: shuttle.id } })).label,
+      ).not.toBe("Plus petite");
+
+      await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ capacity: 1, label: "Plus petite", removeIncompatible: true })
+        .expect(200);
+      const remaining = await t.prisma.trip.findMany({ where: { shuttleId: shuttle.id } });
+      expect(remaining.map((trip) => trip.id)).toEqual([trips[0]!.id]);
+      const removed = await t.prisma.trip.findUniqueOrThrow({ where: { id: trips[2]!.id } });
+      expect(removed).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("changing the direction makes every passenger incompatible", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const pax = await make.pax(eventId);
+      await make.trip(eventId, pax.id, { shuttleId: shuttle.id, status: "ASSIGNED" });
+      const { body } = await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ direction: "RETURN" })
+        .expect(409);
+      expect(body.incompatible).toHaveLength(1);
+      expect(body.incompatible[0].reason).toBe("DIRECTION");
+    });
+  });
+
   describe("GET /pax/me/shuttles (planning for paxs)", () => {
     it("lists shuttles with passenger names only, and the driver's phone only for co-passengers", async () => {
       const driver = await make.pax(eventId, { name: "Sam", contactPhone: "0699" });

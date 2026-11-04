@@ -1,5 +1,14 @@
 import { OmitType, PartialType } from "@nestjs/mapped-types";
-import { IsIn, IsInt, IsNotEmpty, IsString, Min, ValidateIf } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Min,
+  ValidateIf,
+  IsBoolean,
+  IsOptional,
+} from "class-validator";
 import { Direction } from "@desordre/shared-types";
 import type { UpdateShuttleInput } from "@desordre/shared-types";
 import { CreateShuttleDto } from "./create-shuttle.dto.js";
@@ -53,4 +62,9 @@ export class UpdateShuttleDto
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  /** Retire les passager·es rendu·es incompatibles par la modif (sinon 409). */
+  @IsOptional()
+  @IsBoolean()
+  removeIncompatible?: boolean;
 }

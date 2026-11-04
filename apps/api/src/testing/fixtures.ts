@@ -89,6 +89,7 @@ export function makeTrip(overrides: Partial<Trip> = {}): Trip {
     time: "08:05",
     stationId: STATION_ID,
     shuttleId: null,
+    shuttleAssignedAt: null,
     status: "PENDING",
     origin: null,
     carpoolRole: null,

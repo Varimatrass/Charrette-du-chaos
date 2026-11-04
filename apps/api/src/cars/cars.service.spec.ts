@@ -53,6 +53,24 @@ describe("CarsService", () => {
     });
   });
 
+  it("refuses to go below the passengers already declared in a direction (B6)", async () => {
+    prisma.car.findUnique.mockResolvedValue({
+      ...makeCar({ ownerPaxId: pax.id, seats: 3 }),
+      ownerPax: { id: pax.id, name: pax.name },
+      trips: [
+        { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p1", name: "Bilal" } },
+        { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p2", name: "Kim" } },
+      ],
+    });
+    await expect(
+      service.upsertMine(pax, { name: "Twingo", seats: 1, lendingMode: "NOT_AVAILABLE" }),
+    ).rejects.toThrow(/2 passager·es au retour \(Bilal, Kim\).*1 place/);
+    expect(prisma.car.upsert).not.toHaveBeenCalled();
+
+    await service.upsertMine(pax, { name: "Twingo", seats: 2, lendingMode: "NOT_AVAILABLE" });
+    expect(prisma.car.upsert).toHaveBeenCalled();
+  });
+
   describe("deleteMine", () => {
     it("deletes the car and puts its passengers back to 'looking for a carpool'", async () => {
       prisma.car.findUnique.mockResolvedValue(makeCar({ ownerPaxId: pax.id }));

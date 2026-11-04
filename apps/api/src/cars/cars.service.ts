@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Car, Pax, Prisma } from "@prisma/client";
-import type { Direction } from "@desordre/shared-types";
+import { Direction } from "@desordre/shared-types";
 import type { CarOverview, PassengerName } from "@desordre/shared-types";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { UpsertCarDto } from "./dto/upsert-car.dto.js";
@@ -39,8 +39,27 @@ export function toCarOverview(car: CarWithTrips): CarOverview {
 export class CarsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Crée ou met à jour la voiture du pax (une seule par pax). */
-  upsertMine(pax: Pax, dto: UpsertCarDto): Promise<Car> {
+  /**
+   * Crée ou met à jour la voiture du pax (une seule par pax). On ne peut pas
+   * descendre sous le nombre de passager·es déjà déclaré·es dans un sens :
+   * il faut d'abord qu'iels changent de voiture.
+   */
+  async upsertMine(pax: Pax, dto: UpsertCarDto): Promise<Car> {
+    const existing = await this.prisma.car.findUnique({
+      where: { ownerPaxId: pax.id },
+      include: OVERVIEW_INCLUDE,
+    });
+    if (existing) {
+      const { passengers } = toCarOverview(existing);
+      for (const direction of [Direction.OUTBOUND, Direction.RETURN]) {
+        const names = passengers[direction].map((p) => p.name);
+        if (names.length > dto.seats) {
+          throw new BadRequestException(
+            `Ta voiture a déjà ${names.length} passager·e${names.length > 1 ? "s" : ""} ${direction === Direction.OUTBOUND ? "à l'aller" : "au retour"} (${names.join(", ")}) : tu ne peux pas descendre à ${dto.seats} place${dto.seats > 1 ? "s" : ""}. Demande-leur de changer de voiture d'abord.`,
+          );
+        }
+      }
+    }
     return this.prisma.car.upsert({
       where: { ownerPaxId: pax.id },
       create: { eventId: pax.eventId, ownerPaxId: pax.id, ...dto },

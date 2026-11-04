@@ -107,6 +107,7 @@ describe("TripsService", () => {
           ...NO_MODE_FIELDS,
           stationId: STATION_ID,
           shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: null,
           status: TripStatus.TO_RECHECK,
         },
       });
@@ -284,7 +285,11 @@ describe("TripsService", () => {
       expect(prisma.$queryRaw).toHaveBeenCalledBefore(prisma.shuttle.findUnique);
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: SHUTTLE_ID, status: TripStatus.ASSIGNED },
+        data: {
+          shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: expect.any(Date),
+          status: TripStatus.ASSIGNED,
+        },
       });
     });
 
@@ -322,7 +327,7 @@ describe("TripsService", () => {
       await service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: null });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: null, status: TripStatus.PENDING },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: TripStatus.PENDING },
       });
     });
 
@@ -441,7 +446,11 @@ describe("TripsService", () => {
       await service.assign(TRIP_ID, { shuttleId: SHUTTLE_ID });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: SHUTTLE_ID, status: TripStatus.ASSIGNED },
+        data: {
+          shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: expect.any(Date),
+          status: TripStatus.ASSIGNED,
+        },
       });
     });
 
@@ -460,7 +469,7 @@ describe("TripsService", () => {
       await service.assign(TRIP_ID, { shuttleId: null });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: null, status: TripStatus.PENDING },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: TripStatus.PENDING },
       });
     });
 

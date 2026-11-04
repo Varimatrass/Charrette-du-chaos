@@ -122,6 +122,7 @@ export class TripsService {
         data: {
           ...fields,
           shuttleId: keepsShuttle ? existing.shuttleId : null,
+          shuttleAssignedAt: keepsShuttle ? existing.shuttleAssignedAt : null,
           status: keepsShuttle
             ? statusAfterPaxEdit(existing.status)
             : statusWithoutShuttle(fields.mode),
@@ -208,7 +209,11 @@ export class TripsService {
     if (dto.shuttleId === null) {
       return this.prisma.trip.update({
         where: { id: trip.id },
-        data: { shuttleId: null, status: statusWithoutShuttle(trip.mode) },
+        data: {
+          shuttleId: null,
+          shuttleAssignedAt: null,
+          status: statusWithoutShuttle(trip.mode),
+        },
       });
     }
     if (trip.mode !== TransportMode.TRAIN) {
@@ -235,9 +240,10 @@ export class TripsService {
       if (trip.shuttleId !== shuttle.id && shuttle.remainingSeats <= 0) {
         throw new BadRequestException("Cette navette est pleine");
       }
+      if (trip.shuttleId === shuttle.id) return trip;
       return tx.trip.update({
         where: { id: trip.id },
-        data: { shuttleId: shuttle.id, status: TripStatus.ASSIGNED },
+        data: { shuttleId: shuttle.id, shuttleAssignedAt: new Date(), status: TripStatus.ASSIGNED },
       });
     });
   }
@@ -323,6 +329,7 @@ export class TripsService {
       where: { id },
       data: {
         shuttleId: dto.shuttleId,
+        shuttleAssignedAt: dto.shuttleId ? new Date() : null,
         status: dto.shuttleId ? TripStatus.ASSIGNED : statusWithoutShuttle(trip.mode),
       },
     });

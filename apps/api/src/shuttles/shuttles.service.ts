@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import type { Direction, IncompatiblePassenger } from "@desordre/shared-types";
 import type { Prisma, Shuttle } from "@prisma/client";
 import { toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
@@ -13,7 +19,10 @@ const SHUTTLES_ORDER = [{ day: "asc" }, { departureTime: "asc" }] as const;
 /** Ce qu'on expose du/de la conducteur·ice dans les listes : juste de quoi l'identifier. */
 const DRIVER_SELECT = { select: { id: true, name: true } } as const;
 
-/** Places restantes = capacité − nombre de trajets assignés (jamais négatif à l'affichage). */
+/**
+ * Places restantes = capacité − nombre de trajets assignés. Négatif quand
+ * l'orga a surbooké la navette (permis, mais affiché en rouge).
+ */
 export function remainingSeats(capacity: number, assignedTrips: number): number {
   return capacity - assignedTrips;
 }
@@ -114,20 +123,57 @@ export class ShuttlesService {
     };
   }
 
+  /**
+   * Modifie une navette. Si la modif rend des passager·es incompatibles
+   * (autre sens, autre jour que leur trajet, plus assez de places), rien
+   * n'est enregistré et on répond 409 avec la liste ; l'orga confirme en
+   * renvoyant `removeIncompatible: true`, et ces passager·es sont retiré·es
+   * (leur trajet repasse "en attente").
+   */
   async update(id: string, dto: UpdateShuttleDto): Promise<Shuttle> {
-    const shuttle = await this.ensureExists(id);
-    if (dto.driverPaxId) await this.ensureDriverInEvent(shuttle.eventId, dto.driverPaxId);
-    return this.prisma.shuttle.update({
+    const { removeIncompatible, ...changes } = dto;
+    const shuttle = await this.prisma.shuttle.findUnique({
       where: { id },
-      data: omitUndefined({
-        ...dto,
-        day: dto.day === undefined ? undefined : toDate(dto.day),
-        // Le lien vers un pax est une clé étrangère : contrairement aux
-        // autres champs texte optionnels, une chaîne vide ne veut rien dire
-        // pour Postgres — on la traite comme "délier" (null).
-        driverPaxId: dto.driverPaxId === undefined ? undefined : dto.driverPaxId || null,
-      }),
+      include: {
+        trips: {
+          select: { id: true, day: true, shuttleAssignedAt: true, pax: { select: { name: true } } },
+        },
+      },
     });
+    if (!shuttle) throw new NotFoundException("Navette introuvable");
+    if (changes.driverPaxId) await this.ensureDriverInEvent(shuttle.eventId, changes.driverPaxId);
+
+    const incompatible = findIncompatiblePassengers(shuttle, {
+      direction: changes.direction,
+      day: changes.day === undefined ? undefined : toDate(changes.day),
+      capacity: changes.capacity,
+    });
+    if (incompatible.length > 0 && !removeIncompatible) {
+      throw new ConflictException({
+        statusCode: 409,
+        message: `Cette modification ne laisse plus de place à ${incompatible.length} passager·e${incompatible.length > 1 ? "s" : ""}.`,
+        incompatible,
+      });
+    }
+
+    const data = omitUndefined({
+      ...changes,
+      day: changes.day === undefined ? undefined : toDate(changes.day),
+      // Le lien vers un pax est une clé étrangère : contrairement aux
+      // autres champs texte optionnels, une chaîne vide ne veut rien dire
+      // pour Postgres — on la traite comme "délier" (null).
+      driverPaxId: changes.driverPaxId === undefined ? undefined : changes.driverPaxId || null,
+    });
+
+    if (incompatible.length === 0) return this.prisma.shuttle.update({ where: { id }, data });
+    const [, updated] = await this.prisma.$transaction([
+      this.prisma.trip.updateMany({
+        where: { id: { in: incompatible.map((p) => p.tripId) } },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: "PENDING" },
+      }),
+      this.prisma.shuttle.update({ where: { id }, data }),
+    ]);
+    return updated;
   }
 
   private async ensureExists(id: string): Promise<{ id: string; eventId: string }> {
@@ -149,4 +195,56 @@ export class ShuttlesService {
       throw new BadRequestException("Le/la conducteur·ice doit être un pax de cet évènement");
     }
   }
+}
+
+interface ShuttlePassengersSnapshot {
+  direction: Direction;
+  day: Date;
+  capacity: number;
+  trips: { id: string; day: Date | null; shuttleAssignedAt: Date | null; pax: { name: string } }[];
+}
+
+/**
+ * Passager·es qui ne tiendraient plus dans la navette après modification :
+ * tout le monde si le sens change ; celleux dont le trajet est un autre jour
+ * si le jour change ; puis, s'il reste plus de monde que de places, les
+ * dernier·es entré·es dans la navette.
+ */
+export function findIncompatiblePassengers(
+  shuttle: ShuttlePassengersSnapshot,
+  changes: { direction?: Direction; day?: Date; capacity?: number },
+): IncompatiblePassenger[] {
+  const toPassenger = (
+    trip: ShuttlePassengersSnapshot["trips"][number],
+    reason: IncompatiblePassenger["reason"],
+  ) => ({ tripId: trip.id, paxName: trip.pax.name, reason });
+
+  if (changes.direction !== undefined && changes.direction !== shuttle.direction) {
+    return shuttle.trips.map((trip) => toPassenger(trip, "DIRECTION"));
+  }
+
+  const result: IncompatiblePassenger[] = [];
+  let remaining = shuttle.trips;
+  const newDay = changes.day;
+  if (newDay && isoDay(newDay) !== isoDay(shuttle.day)) {
+    const wrongDay = (trip: (typeof remaining)[number]) =>
+      trip.day !== null && isoDay(trip.day) !== isoDay(newDay);
+    result.push(...remaining.filter(wrongDay).map((trip) => toPassenger(trip, "DAY")));
+    remaining = remaining.filter((trip) => !wrongDay(trip));
+  }
+
+  const capacity = changes.capacity ?? shuttle.capacity;
+  if (changes.capacity !== undefined && remaining.length > capacity) {
+    const lastIn = [...remaining].sort(
+      (a, b) => (b.shuttleAssignedAt?.getTime() ?? 0) - (a.shuttleAssignedAt?.getTime() ?? 0),
+    );
+    result.push(
+      ...lastIn.slice(0, remaining.length - capacity).map((trip) => toPassenger(trip, "CAPACITY")),
+    );
+  }
+  return result;
+}
+
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }

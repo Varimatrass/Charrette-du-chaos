@@ -112,6 +112,8 @@ export interface Trip {
   /** Train : gare d'arrivée (aller) / de départ (retour). */
   stationId: string | null;
   shuttleId: string | null;
+  /** Moment de l'entrée dans la navette (les dernier·es arrivé·es sortent en premier). */
+  shuttleAssignedAt: string | null;
   status: TripStatus;
   /** Covoiturage : d'où le pax part (aller) / où iel rentre (retour). */
   origin: string | null;
@@ -178,6 +180,26 @@ export interface PassengerName {
 export interface ShuttleWithPassengerNames extends ShuttleWithRemainingSeats {
   passengers: PassengerName[];
   driverContactPhone: string | null;
+}
+
+/** Pourquoi un·e passager·e ne tiendrait plus dans une navette modifiée. */
+export type ShuttleIncompatibilityReason = "DIRECTION" | "DAY" | "CAPACITY";
+
+export interface IncompatiblePassenger {
+  tripId: string;
+  paxName: string;
+  reason: ShuttleIncompatibilityReason;
+}
+
+/**
+ * Réponse 409 de PATCH /admin/shuttles/:id quand la modification (sens, jour,
+ * capacité) rend des passager·es incompatibles : rien n'est enregistré, l'orga
+ * confirme en renvoyant la même modif avec `removeIncompatible: true`.
+ */
+export interface ShuttleUpdateConflict {
+  statusCode: 409;
+  message: string;
+  incompatible: IncompatiblePassenger[];
 }
 
 /** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */

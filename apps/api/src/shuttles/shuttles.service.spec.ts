@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { WaitLevel } from "@desordre/shared-types";
 import {
   EVENT_ID,
@@ -10,7 +10,7 @@ import {
   SHUTTLE_ID,
 } from "../testing/fixtures.js";
 import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
-import { remainingSeats, ShuttlesService } from "./shuttles.service.js";
+import { findIncompatiblePassengers, remainingSeats, ShuttlesService } from "./shuttles.service.js";
 
 describe("remainingSeats", () => {
   it("is capacity minus assigned trips", () => {
@@ -115,7 +115,7 @@ describe("ShuttlesService", () => {
 
   describe("update", () => {
     beforeEach(() => {
-      prisma.shuttle.findUnique.mockResolvedValue({ id: SHUTTLE_ID, eventId: EVENT_ID });
+      prisma.shuttle.findUnique.mockResolvedValue({ ...makeShuttle(), trips: [] });
       prisma.shuttle.update.mockResolvedValue(makeShuttle());
       prisma.pax.findUnique.mockResolvedValue({ eventId: EVENT_ID });
     });
@@ -141,5 +141,84 @@ describe("ShuttlesService", () => {
       await expect(service.update("missing", { label: "x" })).rejects.toThrow(NotFoundException);
       expect(prisma.shuttle.update).not.toHaveBeenCalled();
     });
+
+    it("answers 409 with the incompatible passengers instead of saving (B5)", async () => {
+      prisma.shuttle.findUnique.mockResolvedValue({
+        ...makeShuttle(),
+        trips: [passenger("t1", "Alix", null)],
+      });
+      await expect(service.update(SHUTTLE_ID, { direction: "RETURN" })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.shuttle.update).not.toHaveBeenCalled();
+    });
+
+    it("removes the incompatible passengers when confirmed", async () => {
+      prisma.shuttle.findUnique.mockResolvedValue({
+        ...makeShuttle(),
+        trips: [passenger("t1", "Alix", null)],
+      });
+      prisma.$transaction.mockResolvedValueOnce([{ count: 1 }, makeShuttle()]);
+      await service.update(SHUTTLE_ID, { direction: "RETURN", removeIncompatible: true });
+      expect(prisma.trip.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["t1"] } },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: "PENDING" },
+      });
+      expect(prisma.shuttle.update).toHaveBeenCalledWith({
+        where: { id: SHUTTLE_ID },
+        data: { direction: "RETURN" },
+      });
+    });
+  });
+
+  describe("findIncompatiblePassengers", () => {
+    const base = {
+      direction: "OUTBOUND" as const,
+      day: new Date("2026-09-18"),
+      capacity: 3,
+      trips: [
+        passenger("early", "Alix", new Date("2026-09-01T10:00:00Z")),
+        passenger("late", "Bilal", new Date("2026-09-03T10:00:00Z")),
+        passenger("middle", "Kim", new Date("2026-09-02T10:00:00Z"), new Date("2026-09-19")),
+      ],
+    };
+
+    it("is empty when nothing relevant changes", () => {
+      expect(findIncompatiblePassengers(base, { capacity: 3 })).toEqual([]);
+      expect(findIncompatiblePassengers(base, { day: new Date("2026-09-18") })).toEqual([]);
+    });
+
+    it("flags everybody when the direction changes", () => {
+      expect(
+        findIncompatiblePassengers(base, { direction: "RETURN" }).map((p) => p.reason),
+      ).toEqual(["DIRECTION", "DIRECTION", "DIRECTION"]);
+    });
+
+    it("flags passengers travelling another day when the day changes (unknown days are fine)", () => {
+      const result = findIncompatiblePassengers(
+        { ...base, trips: [...base.trips, passenger("noday", "Jo", null, null)] },
+        { day: new Date("2026-09-19") },
+      );
+      expect(result).toEqual([
+        { tripId: "early", paxName: "Alix", reason: "DAY" },
+        { tripId: "late", paxName: "Bilal", reason: "DAY" },
+      ]);
+    });
+
+    it("flags the last ones in when the capacity drops below the passenger count", () => {
+      expect(findIncompatiblePassengers(base, { capacity: 1 })).toEqual([
+        { tripId: "late", paxName: "Bilal", reason: "CAPACITY" },
+        { tripId: "middle", paxName: "Kim", reason: "CAPACITY" },
+      ]);
+    });
   });
 });
+
+function passenger(
+  id: string,
+  name: string,
+  assignedAt: Date | null,
+  day: Date | null = new Date("2026-09-18"),
+) {
+  return { id, day, shuttleAssignedAt: assignedAt, pax: { name } };
+}

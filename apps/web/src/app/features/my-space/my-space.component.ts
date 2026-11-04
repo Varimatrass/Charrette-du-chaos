@@ -272,9 +272,9 @@ export class MySpaceComponent {
         this.notify("Voiture enregistrée.");
         this.paxApi.updateMyInfo(this.token, { hasVehicle: true }).subscribe(() => this.load());
       },
-      error: () => {
+      error: (error: unknown) => {
         this.savingCar.set(false);
-        this.notify("Échec de l'enregistrement, réessaie.", SNACKBAR_LONG_MS);
+        this.notify(this.errorMessage(error, "Échec de l'enregistrement, réessaie."), 6000);
       },
     });
   }

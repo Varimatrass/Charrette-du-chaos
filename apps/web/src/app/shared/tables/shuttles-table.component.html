@@ -77,8 +77,15 @@
   @if (editingShuttle(); as editing) {
     <div class="detail-panel">
       <h3>
-        Passager·es de {{ editing.label }} ({{ editing.passengers.length }} /
-        {{ editing.capacity }})
+        Passager·es de {{ editing.label }}
+        <span [class.text-danger]="editing.passengers.length > editing.capacity">
+          ({{ editing.passengers.length }} / {{ editing.capacity }})
+        </span>
+        @if (editing.passengers.length > editing.capacity) {
+          <span class="badge-danger seats-overbooked">
+            surbookée +{{ editing.passengers.length - editing.capacity }}
+          </span>
+        }
       </h3>
       @if (editing.passengers.length === 0) {
         <p class="hint">Personne pour l'instant.</p>
@@ -161,7 +168,19 @@
     </ng-container>
     <ng-container matColumnDef="seats">
       <th mat-header-cell *matHeaderCellDef>Places restantes</th>
-      <td mat-cell *matCellDef="let s">{{ s.remainingSeats }} / {{ s.capacity }}</td>
+      <td mat-cell *matCellDef="let s">
+        @if (s.remainingSeats < 0) {
+          <span class="text-danger">{{ s.remainingSeats }} / {{ s.capacity }}</span>
+          <span
+            class="badge-danger seats-overbooked"
+            [title]="s.capacity - s.remainingSeats + ' passager·es pour ' + s.capacity + ' places'"
+          >
+            surbookée +{{ -s.remainingSeats }}
+          </span>
+        } @else {
+          {{ s.remainingSeats }} / {{ s.capacity }}
+        }
+      </td>
     </ng-container>
     <ng-container matColumnDef="passengers">
       <th mat-header-cell *matHeaderCellDef>Avec qui</th>

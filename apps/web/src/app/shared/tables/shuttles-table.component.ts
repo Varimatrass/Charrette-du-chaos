@@ -17,8 +17,17 @@ import type {
   ShuttleWithPassengerNames,
   ShuttleWithPassengers,
   ShuttleWithRemainingSeats,
+  ShuttleIncompatibilityReason,
+  ShuttleUpdateConflict,
   TripWithPax,
+  UpdateShuttleInput,
 } from "@desordre/shared-types";
+import { HttpErrorResponse } from "@angular/common/http";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from "../confirm-dialog/confirm-dialog.component";
 import { AdminApiService, PaxAdminWithTrips } from "../../core/api/admin-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
@@ -27,6 +36,19 @@ import { EntityOption, EntitySelectComponent } from "../entity-select/entity-sel
 import { DIRECTIONS, TableContext } from "./table-role";
 
 const DEFAULT_CAPACITY = 4;
+
+const INCOMPATIBILITY_LABELS: Record<ShuttleIncompatibilityReason, string> = {
+  DIRECTION: "la navette ne va plus dans le sens de son trajet",
+  DAY: "son trajet est un autre jour",
+  CAPACITY: "plus de place (dernier·e arrivé·e dans la navette)",
+};
+
+/** Reconnaît la réponse 409 "passager·es incompatibles" de PATCH /admin/shuttles/:id. */
+function asShuttleUpdateConflict(error: unknown): ShuttleUpdateConflict | null {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 409) return null;
+  const body = error.error as Partial<ShuttleUpdateConflict> | null;
+  return body && Array.isArray(body.incompatible) ? (body as ShuttleUpdateConflict) : null;
+}
 
 /** Une ligne : navette + (pax) noms des passager·es et téléphone du conducteur si on est dedans. */
 type ShuttleRow = ShuttleWithRemainingSeats &
@@ -46,6 +68,7 @@ type ShuttleRow = ShuttleWithRemainingSeats &
     ReactiveFormsModule,
     MatButtonModule,
     MatButtonToggleModule,
+    MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -64,6 +87,7 @@ export class ShuttlesTableComponent {
   private readonly adminApi = inject(AdminApiService);
   private readonly paxApi = inject(PaxApiService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly Direction = Direction;
   readonly WaitLevel = WaitLevel;
@@ -271,25 +295,69 @@ export class ShuttlesTableComponent {
     };
 
     const editingId = this.editingShuttleId();
-    const request = editingId
-      ? this.adminApi.updateShuttle(editingId, { ...required, ...mapValues(optional, emptyToNull) })
-      : this.adminApi.createShuttle({
-          eventId: this.context().eventId ?? "",
-          ...required,
-          ...mapValues(optional, emptyToUndefined),
-        });
+    if (editingId) {
+      this.saveChanges(editingId, { ...required, ...mapValues(optional, emptyToNull) });
+      return;
+    }
+    this.adminApi
+      .createShuttle({
+        eventId: this.context().eventId ?? "",
+        ...required,
+        ...mapValues(optional, emptyToUndefined),
+      })
+      .subscribe({
+        next: () => this.afterSave("Navette créée."),
+        error: (error: unknown) => this.notifyError(error, "Échec de l'enregistrement, réessaie."),
+      });
+  }
 
-    request.subscribe({
-      next: () => {
-        this.snackBar.open(editingId ? "Navette modifiée." : "Navette créée.", undefined, {
-          duration: 2000,
-        });
-        this.closeForm();
-        this.load();
+  /**
+   * Enregistre une modif de navette. Si elle rend des passager·es
+   * incompatibles (autre sens, autre jour, plus assez de places), l'API
+   * répond 409 avec la liste : on la montre et on ne retire ces personnes
+   * qu'après confirmation.
+   */
+  private saveChanges(id: string, input: UpdateShuttleInput): void {
+    this.adminApi.updateShuttle(id, input).subscribe({
+      next: () => this.afterSave("Navette modifiée."),
+      error: (error: unknown) => {
+        const conflict = asShuttleUpdateConflict(error);
+        if (!conflict) {
+          this.notifyError(error, "Échec de l'enregistrement, réessaie.");
+          return;
+        }
+        this.dialog
+          .open(ConfirmDialogComponent, {
+            data: {
+              title: "Des passager·es ne tiennent plus dans la navette",
+              message: `${conflict.message} Si tu confirmes, iels seront retiré·es de la navette (leur trajet repasse « en attente ») :`,
+              items: conflict.incompatible.map(
+                (p) => `${p.paxName} — ${INCOMPATIBILITY_LABELS[p.reason]}`,
+              ),
+              confirmLabel: "Retirer et enregistrer",
+              danger: true,
+            } satisfies ConfirmDialogData,
+          })
+          .afterClosed()
+          .subscribe((confirmed) => {
+            if (confirmed) this.saveChanges(id, { ...input, removeIncompatible: true });
+          });
       },
-      error: () =>
-        this.snackBar.open("Échec de l'enregistrement, réessaie.", undefined, { duration: 3000 }),
     });
+  }
+
+  private afterSave(message: string): void {
+    this.snackBar.open(message, undefined, { duration: 2000 });
+    this.closeForm();
+    this.load();
+  }
+
+  private notifyError(error: unknown, fallback: string): void {
+    const message =
+      error instanceof HttpErrorResponse && typeof error.error?.message === "string"
+        ? error.error.message
+        : fallback;
+    this.snackBar.open(message, undefined, { duration: 4000 });
   }
 
   addPassenger(): void {

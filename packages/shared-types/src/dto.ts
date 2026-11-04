@@ -133,7 +133,14 @@ export type UpdateShuttleInput = Partial<
     "label" | "day" | "direction" | "departureTime" | "stationArrivalTime" | "capacity"
   >
 > &
-  Nullable<Pick<CreateShuttleInput, "vehicle" | "venueReturnTime" | "comment" | "driverPaxId">>;
+  Nullable<Pick<CreateShuttleInput, "vehicle" | "venueReturnTime" | "comment" | "driverPaxId">> & {
+    /**
+     * Confirme une modif qui rend des passager·es incompatibles (autre sens,
+     * autre jour, plus assez de places) : iels sont retiré·es de la navette.
+     * Sans ce flag, l'API répond 409 avec la liste (ShuttleUpdateConflict).
+     */
+    removeIncompatible?: boolean;
+  };
 
 // ---- Recherche / lookup admin ----
 

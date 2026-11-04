@@ -237,6 +237,30 @@ describe("Trips (e2e)", () => {
       expect(cars.body[0].passengers.OUTBOUND).toEqual([{ paxId, name: "Alix Moreau" }]);
     });
 
+    it("a driver cannot reduce their seats below the passengers already in (B6)", async () => {
+      const driver = await make.pax(eventId, { name: "Fanta" });
+      const car = await make.car(eventId, driver.id, { seats: 2 });
+      await make.trip(eventId, paxId, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: car.id,
+        status: "NO_SHUTTLE",
+      });
+      const { body } = await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(driver.accessToken))
+        .send({ name: "Twingo verte", seats: 0, lendingMode: "NOT_AVAILABLE" })
+        .expect(400);
+      expect(body.message).toMatch(/Alix Moreau/);
+      await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(driver.accessToken))
+        .send({ name: "Twingo verte", seats: 1, lendingMode: "NOT_AVAILABLE" })
+        .expect(200);
+    });
+
     it("deleting one's car sends its passengers back to 'looking for a carpool'", async () => {
       await t
         .http()

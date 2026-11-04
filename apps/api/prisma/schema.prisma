@@ -198,6 +198,9 @@ model Trip {
   // l'évènement.
   stationId         String?        @map("station_id")
   shuttleId         String?        @map("shuttle_id")
+  // Moment de l'entrée dans la navette : si la navette perd des places, les
+  // dernier·es arrivé·es en sortent en premier.
+  shuttleAssignedAt DateTime?      @map("shuttle_assigned_at")
   status            TripStatus     @default(PENDING)
   // Covoiturage : d'où le pax part (aller) / où iel rentre (retour), texte libre.
   origin            String?
