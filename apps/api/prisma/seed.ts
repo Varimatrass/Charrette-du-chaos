@@ -81,7 +81,10 @@ const SHUTTLES: Record<
     direction: Direction;
     /** Nom du pax conducteur·ice (doit exister dans PAXS). */
     driver: string;
-    /** Véhicule de l'orga (voiture sans propriétaire, créée une fois par nom). */
+    /**
+     * Véhicule : la voiture d'un pax si elle porte ce nom, sinon un véhicule
+     * de l'orga (voiture sans propriétaire, créée une fois par nom).
+     */
     vehicle: string;
     departureTime: string;
     stationArrivalTime: string;
@@ -433,7 +436,9 @@ async function main(): Promise<void> {
     (typeof SHUTTLES)[ShuttleKey],
   ][]) {
     const { driver, vehicle, ...data } = shuttle;
-    let vehicleCarId = vehicleIds.get(vehicle);
+    let vehicleCarId =
+      vehicleIds.get(vehicle) ??
+      (await prisma.car.findFirst({ where: { eventId: event.id, name: vehicle } }))?.id;
     if (!vehicleCarId) {
       const car = await prisma.car.create({
         data: {

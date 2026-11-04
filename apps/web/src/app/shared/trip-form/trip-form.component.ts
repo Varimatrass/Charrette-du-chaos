@@ -98,7 +98,8 @@ export class TripFormComponent {
 
   readonly carOptions = computed<EntityOption[]>(() => {
     const options: EntityOption[] = this.cars()
-      .filter((car) => car.owner?.id !== this.myPaxId())
+      // Pas sa propre voiture, ni un véhicule de navette de l'orga (sans propriétaire ni passager·e).
+      .filter((car) => car.owner?.id !== this.myPaxId() && !isOrgaShuttleVehicle(car))
       .map((car) => {
         const seats = car.remainingSeats[this.direction()];
         const seatsHint = seats > 0 ? `${seats} place${seats > 1 ? "s" : ""}` : "complet";
@@ -194,4 +195,13 @@ export class TripFormComponent {
     }
     return input;
   }
+}
+
+/** Véhicule créé par l'orga pour une navette : pas une voiture de covoit. */
+function isOrgaShuttleVehicle(car: CarOverview): boolean {
+  return (
+    car.owner === null &&
+    car.isShuttleVehicle &&
+    car.passengers.OUTBOUND.length + car.passengers.RETURN.length === 0
+  );
 }

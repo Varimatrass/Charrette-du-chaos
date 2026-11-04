@@ -11,24 +11,37 @@ ALTER TABLE "cars" ADD CONSTRAINT "cars_owner_pax_id_fkey"
 
 -- ---------------------------------------------------------------------------
 -- Le véhicule d'une navette devient une voiture de l'évènement (au lieu d'un
--- texte libre). Chaque texte distinct devient une voiture sans propriétaire,
--- prêtable à n'importe quel·le conducteur·ice, avec la capacité de la navette.
+-- texte libre). Si le texte correspond au nom d'une voiture déjà déclarée par
+-- un pax de l'évènement, c'est elle. Sinon, chaque texte distinct devient une
+-- voiture sans propriétaire, prêtable à tout le monde, avec la capacité de la
+-- navette.
 -- ---------------------------------------------------------------------------
 ALTER TABLE "shuttles" ADD COLUMN "vehicle_car_id" TEXT;
+
+UPDATE "shuttles" AS s
+SET "vehicle_car_id" = (
+  SELECT c."id" FROM "cars" AS c
+  WHERE c."event_id" = s."event_id"
+    AND lower(c."name") = lower(btrim(regexp_replace(s."vehicle", '\s+', ' ', 'g')))
+  ORDER BY c."created_at"
+  LIMIT 1
+)
+WHERE s."vehicle" IS NOT NULL AND btrim(s."vehicle") <> '';
 
 INSERT INTO "cars" ("id", "event_id", "owner_pax_id", "name", "seats", "lending_mode", "updated_at")
 SELECT gen_random_uuid()::text, "event_id", NULL, "name", "seats", 'AVAILABLE_ANY_DRIVER', CURRENT_TIMESTAMP
 FROM (
   SELECT "event_id", btrim(regexp_replace("vehicle", '\s+', ' ', 'g')) AS "name", MAX("capacity") AS "seats"
   FROM "shuttles"
-  WHERE "vehicle" IS NOT NULL AND btrim("vehicle") <> ''
+  WHERE "vehicle_car_id" IS NULL AND "vehicle" IS NOT NULL AND btrim("vehicle") <> ''
   GROUP BY "event_id", btrim(regexp_replace("vehicle", '\s+', ' ', 'g'))
 ) AS "vehicles";
 
 UPDATE "shuttles" AS s
 SET "vehicle_car_id" = c."id"
 FROM "cars" AS c
-WHERE c."owner_pax_id" IS NULL
+WHERE s."vehicle_car_id" IS NULL
+  AND c."owner_pax_id" IS NULL
   AND c."event_id" = s."event_id"
   AND c."name" = btrim(regexp_replace(s."vehicle", '\s+', ' ', 'g'));
 

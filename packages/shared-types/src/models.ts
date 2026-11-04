@@ -71,6 +71,8 @@ export interface CarOverview {
   lendingMode: VehicleLendingMode;
   /** `null` = voiture sans propriétaire (conducteur·ice pas inscrit·e, ou véhicule de l'orga). */
   owner: { id: string; name: string } | null;
+  /** Utilisée comme véhicule d'au moins une navette. */
+  isShuttleVehicle: boolean;
   /** Passager·es déjà déclaré·es, par direction. */
   passengers: Record<Direction, PassengerName[]>;
   remainingSeats: Record<Direction, number>;

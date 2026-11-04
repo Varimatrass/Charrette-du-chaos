@@ -153,8 +153,12 @@
             <li>
               <strong>{{ car.name }}</strong>
               <span class="hint">
-                ({{ car.passengers.OUTBOUND.length + car.passengers.RETURN.length }}
-                passager·e(s) déclaré·e(s))
+                @if (car.isShuttleVehicle) {
+                  (véhicule de navette)
+                } @else {
+                  ({{ car.passengers.OUTBOUND.length + car.passengers.RETURN.length }}
+                  passager·e(s) déclaré·e(s))
+                }
               </span>
               <button
                 mat-stroked-button

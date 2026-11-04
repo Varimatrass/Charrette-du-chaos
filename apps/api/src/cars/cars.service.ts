@@ -7,6 +7,7 @@ import { UpsertCarDto } from "./dto/upsert-car.dto.js";
 
 const OVERVIEW_INCLUDE = {
   ownerPax: { select: { id: true, name: true } },
+  _count: { select: { shuttles: true } },
   trips: {
     select: { direction: true, carpoolRole: true, pax: { select: { id: true, name: true } } },
   },
@@ -27,6 +28,7 @@ export function toCarOverview(car: CarWithTrips): CarOverview {
     seats: car.seats,
     lendingMode: car.lendingMode,
     owner: car.ownerPax ? { id: car.ownerPax.id, name: car.ownerPax.name } : null,
+    isShuttleVehicle: car._count.shuttles > 0,
     passengers,
     remainingSeats: {
       OUTBOUND: car.seats - passengers.OUTBOUND.length,

@@ -6,6 +6,7 @@ import { CarsService, toCarOverview } from "./cars.service.js";
 const carWithTrips = (seats = 1) => ({
   ...makeCar({ seats, ownerPaxId: OTHER_PAX_ID }),
   ownerPax: { id: OTHER_PAX_ID, name: "Bilal" },
+  _count: { shuttles: 0 },
   trips: [
     {
       direction: "OUTBOUND" as const,
@@ -57,6 +58,7 @@ describe("CarsService", () => {
     prisma.car.findUnique.mockResolvedValue({
       ...makeCar({ ownerPaxId: pax.id, seats: 3 }),
       ownerPax: { id: pax.id, name: pax.name },
+      _count: { shuttles: 0 },
       trips: [
         { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p1", name: "Bilal" } },
         { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p2", name: "Kim" } },
