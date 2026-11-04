@@ -360,6 +360,34 @@ export class ShuttlesTableComponent {
     this.snackBar.open(message, undefined, { duration: 4000 });
   }
 
+  /** Supprime la navette en cours de modification, après confirmation. */
+  deleteShuttle(): void {
+    const editing = this.editingShuttle();
+    const id = this.editingShuttleId();
+    if (!id) return;
+    const passengers = editing?.passengers.map((trip) => trip.pax.name) ?? [];
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: `Supprimer ${editing?.label ?? "cette navette"} ?`,
+          message: passengers.length
+            ? "Ces passager·es repasseront « en attente » d'une navette :"
+            : "Personne n'est dedans pour l'instant.",
+          items: passengers,
+          confirmLabel: "Supprimer",
+          danger: true,
+        } satisfies ConfirmDialogData,
+      })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (!confirmed) return;
+        this.adminApi.deleteShuttle(id).subscribe({
+          next: () => this.afterSave("Navette supprimée."),
+          error: (error: unknown) => this.notifyError(error, "Impossible de supprimer la navette."),
+        });
+      });
+  }
+
   addPassenger(): void {
     const tripId = this.passengerToAdd();
     const editing = this.editingShuttle();

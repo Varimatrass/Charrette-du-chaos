@@ -14,6 +14,12 @@ import { PaxApiService } from "../../core/api/pax-api.service";
 import { buildPersonalLink } from "../../core/utils/personal-link";
 import { summarizeTrip, TableContext, TripSummaryInput } from "./table-role";
 
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
+import { apiErrorMessage } from "../../core/utils/http-errors";
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from "../confirm-dialog/confirm-dialog.component";
 /** Une ligne du tableau, quel que soit le rôle ; les champs sensibles ne sont remplis que pour l'orga. */
 interface PaxRow {
   id: string;
@@ -38,6 +44,7 @@ interface PaxRow {
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -53,6 +60,7 @@ export class PaxsTableComponent {
   private readonly adminApi = inject(AdminApiService);
   private readonly paxApi = inject(PaxApiService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly rows = signal<PaxRow[]>([]);
   readonly loading = signal(true);
@@ -63,7 +71,7 @@ export class PaxsTableComponent {
   readonly isAdmin = computed(() => this.context().role === "admin");
   readonly columns = computed(() =>
     this.isAdmin()
-      ? ["name", "outbound", "return", "contact", "comment", "link"]
+      ? ["name", "outbound", "return", "contact", "comment", "link", "actions"]
       : ["name", "outbound", "return"],
   );
   readonly filteredRows = computed(() => {
@@ -140,6 +148,38 @@ export class PaxsTableComponent {
 
   personalLinkOf(row: PaxRow): string {
     return row.accessToken ? buildPersonalLink(row.accessToken) : "";
+  }
+
+  /** Back-office : supprimer un pax (doublon, inscription par erreur), après confirmation. */
+  deletePax(row: PaxRow): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: `Supprimer ${row.name} ?`,
+          message:
+            "Ses trajets, sa voiture et ses dispos de conduite seront supprimés, et son lien personnel ne marchera plus. Les navettes qu'iel conduisait n'auront plus de conducteur·ice, et les passager·es de sa voiture repasseront en « je cherche un covoit ». C'est définitif.",
+          confirmLabel: "Supprimer",
+          danger: true,
+        } satisfies ConfirmDialogData,
+      })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (!confirmed) return;
+        this.adminApi.deletePax(row.id).subscribe({
+          next: () => {
+            this.snackBar.open(`${row.name} a été supprimé·e.`, undefined, { duration: 2000 });
+            this.load();
+          },
+          error: (error: unknown) =>
+            this.snackBar.open(
+              apiErrorMessage(error, "Impossible de supprimer ce pax."),
+              undefined,
+              {
+                duration: 4000,
+              },
+            ),
+        });
+      });
   }
 
   copyLink(row: PaxRow): void {

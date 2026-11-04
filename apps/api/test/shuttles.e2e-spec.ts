@@ -276,6 +276,23 @@ describe("Shuttles (e2e)", () => {
     });
   });
 
+  describe("DELETE /admin/shuttles/:id (B8)", () => {
+    it("deletes the shuttle and puts its passengers back to PENDING", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const pax = await make.pax(eventId);
+      const trip = await make.trip(eventId, pax.id, { shuttleId: shuttle.id, status: "ASSIGNED" });
+
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).expect(401);
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).set(t.asAdmin).expect(204);
+      expect(await t.prisma.shuttle.count()).toBe(0);
+      expect(await t.prisma.trip.findUniqueOrThrow({ where: { id: trip.id } })).toMatchObject({
+        shuttleId: null,
+        status: "PENDING",
+      });
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).set(t.asAdmin).expect(404);
+    });
+  });
+
   describe("GET /pax/me/shuttles (planning for paxs)", () => {
     it("lists shuttles with passenger names only, and the driver's phone only for co-passengers", async () => {
       const driver = await make.pax(eventId, { name: "Sam", contactPhone: "0699" });

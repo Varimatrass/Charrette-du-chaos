@@ -72,6 +72,18 @@
     <button mat-flat-button color="primary" type="submit" class="full-width">
       {{ editingShuttleId() ? "Enregistrer les modifications" : "Créer la navette" }}
     </button>
+    @if (editingShuttleId()) {
+      <button
+        mat-stroked-button
+        color="warn"
+        type="button"
+        class="full-width"
+        (click)="deleteShuttle()"
+      >
+        <mat-icon>delete</mat-icon>
+        Supprimer la navette
+      </button>
+    }
   </form>
 
   @if (editingShuttle(); as editing) {

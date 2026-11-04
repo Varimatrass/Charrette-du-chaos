@@ -91,6 +91,28 @@ export class PaxService {
     return pax;
   }
 
+  /**
+   * Back-office : supprime un pax (doublon, inscription par erreur…), avec
+   * ses trajets et ses dispos. S'iel conduisait une navette, la navette
+   * n'a plus de conducteur·ice ; les passager·es de sa voiture repassent en
+   * "je cherche un covoit".
+   */
+  async remove(id: string): Promise<void> {
+    const pax = await this.prisma.pax.findUnique({ where: { id }, include: { car: true } });
+    if (!pax) throw new NotFoundException("Pax introuvable");
+    await this.prisma.$transaction([
+      ...(pax.car
+        ? [
+            this.prisma.trip.updateMany({
+              where: { carId: pax.car.id, carpoolRole: "PASSENGER" },
+              data: { lookingForCarpool: true },
+            }),
+          ]
+        : []),
+      this.prisma.pax.delete({ where: { id } }),
+    ]);
+  }
+
   /** Vue "annuaire" des paxs de l'évènement, telle que vue par les autres paxs (voir PAX_OVERVIEW_SELECT). */
   findAllForEventOverview(eventId: string): Promise<PaxOverview[]> {
     return this.prisma.pax.findMany({

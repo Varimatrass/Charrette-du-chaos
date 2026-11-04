@@ -179,6 +179,22 @@ export class ShuttlesService {
     return updated;
   }
 
+  /**
+   * Supprime une navette qui n'a plus lieu d'être. Ses passager·es ne sont
+   * pas perdu·es : leur trajet repasse "en attente" d'une navette.
+   */
+  async remove(id: string): Promise<void> {
+    const shuttle = await this.prisma.shuttle.findUnique({ where: { id }, select: { id: true } });
+    if (!shuttle) throw new NotFoundException("Navette introuvable");
+    await this.prisma.$transaction([
+      this.prisma.trip.updateMany({
+        where: { shuttleId: id },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: "PENDING" },
+      }),
+      this.prisma.shuttle.delete({ where: { id } }),
+    ]);
+  }
+
   /** Une navette roule pendant l'évènement. */
   private async ensureDayInEvent(eventId: string, day: Date): Promise<void> {
     const event = await this.prisma.event.findUnique({

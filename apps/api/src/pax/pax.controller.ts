@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -106,5 +109,13 @@ export class PaxController {
   @Get("admin/pax/:id")
   findOneAdmin(@Param("id", ParseUUIDPipe) id: string) {
     return this.paxService.findOneAdmin(id);
+  }
+
+  /** Back-office : supprimer un pax (ex: un doublon). Un pax ne peut pas se désinscrire lui-même. */
+  @UseGuards(AdminGuard)
+  @Delete("admin/pax/:id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param("id", ParseUUIDPipe) id: string) {
+    return this.paxService.remove(id);
   }
 }

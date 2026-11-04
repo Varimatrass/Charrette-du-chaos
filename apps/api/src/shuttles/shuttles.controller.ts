@@ -8,6 +8,9 @@ import {
   Post,
   Query,
   UseGuards,
+  Delete,
+  HttpCode,
+  HttpStatus,
 } from "@nestjs/common";
 import { AdminGuard } from "../common/guards/admin.guard.js";
 import { EventIdQueryDto } from "../common/dto/event-id-query.dto.js";
@@ -42,5 +45,12 @@ export class ShuttlesController {
   @Patch(":id")
   update(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateShuttleDto) {
     return this.shuttlesService.update(id, dto);
+  }
+
+  /** Supprime une navette ; ses passager·es repassent "en attente". */
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param("id", ParseUUIDPipe) id: string) {
+    return this.shuttlesService.remove(id);
   }
 }
