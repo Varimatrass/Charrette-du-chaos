@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { WaitLevel } from "@desordre/shared-types";
 import {
+  makeEvent,
   EVENT_ID,
   makePax,
   makeShuttle,
@@ -23,7 +24,10 @@ describe("ShuttlesService", () => {
   const prisma = createPrismaMock();
   const service = new ShuttlesService(asPrismaService(prisma));
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma.event.findUnique.mockResolvedValue(makeEvent());
+  });
 
   describe("create", () => {
     it("converts the day and treats an empty driverPaxId as 'no driver yet'", async () => {

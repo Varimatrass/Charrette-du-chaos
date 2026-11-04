@@ -73,6 +73,9 @@ export class TripFormComponent {
   readonly carpoolRole = computed(() => this.formValue().carpoolRole ?? null);
   readonly passengerStatus = computed(() => this.formValue().passengerStatus ?? null);
   readonly isOutbound = computed(() => this.direction() === Direction.OUTBOUND);
+  /** Bornes du sélecteur de jour : on n'arrive pas après la fin, on ne repart pas avant le début. */
+  readonly eventStart = computed(() => toDateInputValue(this.event()?.startDate) || null);
+  readonly eventEnd = computed(() => toDateInputValue(this.event()?.endDate) || null);
 
   readonly stationOptions = computed<EntityOption[]>(() => {
     const options: EntityOption[] = this.stations().map((station) => ({

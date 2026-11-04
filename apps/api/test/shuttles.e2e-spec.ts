@@ -90,6 +90,38 @@ describe("Shuttles (e2e)", () => {
         .expect(400);
     });
 
+    it("validates times (HH:mm) and keeps the day within the event (B9)", async () => {
+      for (const departureTime of ["8h", "25:00", "8:00", "12:60"]) {
+        await t
+          .http()
+          .post("/admin/shuttles")
+          .set(t.asAdmin)
+          .send({ ...validShuttle(), departureTime })
+          .expect(400);
+      }
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), day: "18/09/2026" })
+        .expect(400);
+      const { body } = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), day: "2026-09-25" })
+        .expect(400);
+      expect(body.message).toMatch(/pendant l'évènement/);
+
+      const shuttle = await make.shuttle(eventId);
+      await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ day: "2026-09-10" })
+        .expect(400);
+    });
+
     it("lists shuttles with remaining seats, ordered by day then departure time", async () => {
       const late = await make.shuttle(eventId, {
         label: "Tard",

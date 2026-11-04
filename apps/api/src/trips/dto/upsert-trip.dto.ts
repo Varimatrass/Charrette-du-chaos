@@ -1,3 +1,4 @@
+import { IsDay, IsTime } from "../../common/validation/date-time.js";
 import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 import { CarpoolRole, TransportMode } from "@desordre/shared-types";
 import type { UpsertTripInput } from "@desordre/shared-types";
@@ -18,11 +19,11 @@ export class UpsertTripDto implements UpsertTripInput {
   mode?: TransportMode;
 
   @IsOptional()
-  @IsString()
+  @IsDay()
   day?: string;
 
   @IsOptional()
-  @IsString()
+  @IsTime()
   time?: string;
 
   /** Gare existante de l'évènement. */

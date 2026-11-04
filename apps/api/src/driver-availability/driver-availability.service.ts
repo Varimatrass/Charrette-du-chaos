@@ -1,6 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import type { DriverAvailabilitySlot, Pax } from "@prisma/client";
-import { toDate } from "../common/utils/dates.js";
+import { frenchEventRange, isWithinEvent, toDate } from "../common/utils/dates.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { CreateDriverAvailabilitySlotDto } from "./dto/create-driver-availability-slot.dto.js";
 
@@ -10,8 +15,23 @@ const SLOTS_ORDER = [{ day: "asc" }, { startTime: "asc" }] as const;
 export class DriverAvailabilityService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Un pax ajoute un créneau où iel serait dispo pour conduire une navette. */
-  createMine(pax: Pax, dto: CreateDriverAvailabilitySlotDto): Promise<DriverAvailabilitySlot> {
+  /** Un pax ajoute un créneau où iel serait dispo pour conduire une navette, pendant l'évènement. */
+  async createMine(
+    pax: Pax,
+    dto: CreateDriverAvailabilitySlotDto,
+  ): Promise<DriverAvailabilitySlot> {
+    const event = await this.prisma.event.findUniqueOrThrow({
+      where: { id: pax.eventId },
+      select: { startDate: true, endDate: true },
+    });
+    if (!isWithinEvent(event, toDate(dto.day))) {
+      throw new BadRequestException(
+        `Choisis un jour pendant l'évènement (${frenchEventRange(event)})`,
+      );
+    }
+    if (dto.startTime && dto.endTime && dto.endTime < dto.startTime) {
+      throw new BadRequestException("L'heure de fin doit être après l'heure de début");
+    }
     return this.prisma.driverAvailabilitySlot.create({
       data: {
         eventId: pax.eventId,

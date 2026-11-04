@@ -4,6 +4,7 @@ import { CarsService } from "../cars/cars.service.js";
 import { ShuttlesService } from "../shuttles/shuttles.service.js";
 import { StationsService } from "../stations/stations.service.js";
 import {
+  makeEvent,
   CAR_ID,
   EVENT_ID,
   makeCar,
@@ -46,7 +47,10 @@ describe("TripsService", () => {
   const service = new TripsService(asPrismaService(prisma), stations, cars, shuttles);
   const pax = makePax();
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma.event.findUniqueOrThrow.mockResolvedValue(makeEvent());
+  });
 
   describe("upsertMine", () => {
     it("creates a trip with explicit nulls for undecided fields (NO_SHUTTLE when not by train)", async () => {

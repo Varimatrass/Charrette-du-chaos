@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Pax, Prisma, Trip } from "@prisma/client";
 import { CarpoolRole, Direction, TransportMode, TripStatus } from "@desordre/shared-types";
-import { toDateOrNull } from "../common/utils/dates.js";
+import { frenchDay, isoDay, toDate, toDateOrNull } from "../common/utils/dates.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
 import { CarsService } from "../cars/cars.service.js";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -35,21 +35,6 @@ export function statusWithoutShuttle(mode: TransportMode | null): TripStatus {
 /** Les navettes sont réservées aux trajets en train. */
 export const SHUTTLE_TRAIN_ONLY_MESSAGE =
   "Les navettes sont réservées aux paxs qui viennent en train";
-
-/** Jour au format "YYYY-MM-DD" pour comparer des colonnes `@db.Date`. */
-function isoDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-/** Jour lisible en français pour les messages d'erreur ("vendredi 12 juin"). */
-function frenchDay(date: Date): string {
-  return date.toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
-}
 
 /** Champs d'un trajet qui dépendent du mode de transport, remis à plat. */
 interface ModeFields {
@@ -90,6 +75,8 @@ export class TripsService {
         where: { paxId_direction: { paxId: pax.id, direction } },
       });
 
+      await this.ensureDayMakesSense(tx, pax, direction, dto.day);
+
       // `undefined` -> `null` explicite : "pas encore décidé" doit être écrit
       // en base, pas juste omis (sinon un update ne pourrait jamais revenir
       // à "pas décidé" après avoir été renseigné une première fois).
@@ -129,6 +116,51 @@ export class TripsService {
         },
       });
     });
+  }
+
+  /**
+   * Un trajet aller ne peut pas arriver après la fin de l'évènement, un retour
+   * ne peut pas partir avant son début, et on ne repart pas avant d'être
+   * arrivé·e. Arriver en avance ou repartir plus tard reste possible.
+   */
+  private async ensureDayMakesSense(
+    tx: Prisma.TransactionClient,
+    pax: Pax,
+    direction: Direction,
+    rawDay: string | undefined,
+  ): Promise<void> {
+    if (!rawDay) return;
+    const day = toDate(rawDay);
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: pax.eventId },
+      select: { startDate: true, endDate: true },
+    });
+    if (direction === Direction.OUTBOUND && isoDay(day) > isoDay(event.endDate)) {
+      throw new BadRequestException(
+        `L'évènement se termine le ${frenchDay(event.endDate)} : ton arrivée ne peut pas être après.`,
+      );
+    }
+    if (direction === Direction.RETURN && isoDay(day) < isoDay(event.startDate)) {
+      throw new BadRequestException(
+        `L'évènement commence le ${frenchDay(event.startDate)} : ton départ ne peut pas être avant.`,
+      );
+    }
+    const other = await tx.trip.findUnique({
+      where: {
+        paxId_direction: {
+          paxId: pax.id,
+          direction: direction === Direction.OUTBOUND ? Direction.RETURN : Direction.OUTBOUND,
+        },
+      },
+      select: { day: true },
+    });
+    if (!other?.day) return;
+    const [outbound, back] = direction === Direction.OUTBOUND ? [day, other.day] : [other.day, day];
+    if (isoDay(back) < isoDay(outbound)) {
+      throw new BadRequestException(
+        `Ton retour (${frenchDay(back)}) ne peut pas être avant ton arrivée (${frenchDay(outbound)}).`,
+      );
+    }
   }
 
   /**

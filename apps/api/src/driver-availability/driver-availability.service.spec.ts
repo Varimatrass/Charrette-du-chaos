@@ -1,5 +1,12 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
-import { EVENT_ID, makePax, makeSlot, OTHER_PAX_ID, SLOT_ID } from "../testing/fixtures.js";
+import {
+  makeEvent,
+  EVENT_ID,
+  makePax,
+  makeSlot,
+  OTHER_PAX_ID,
+  SLOT_ID,
+} from "../testing/fixtures.js";
 import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
 import { DriverAvailabilityService } from "./driver-availability.service.js";
 
@@ -8,7 +15,10 @@ describe("DriverAvailabilityService", () => {
   const service = new DriverAvailabilityService(asPrismaService(prisma));
   const pax = makePax();
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma.event.findUniqueOrThrow.mockResolvedValue(makeEvent());
+  });
 
   it("creates a slot for the current pax and their event", async () => {
     prisma.driverAvailabilitySlot.create.mockResolvedValue(makeSlot());

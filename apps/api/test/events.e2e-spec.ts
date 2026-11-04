@@ -84,6 +84,22 @@ describe("Events (e2e)", () => {
         .expect(400);
     });
 
+    it("refuses an event ending before it starts, on creation and on update (B9)", async () => {
+      await t
+        .http()
+        .post("/admin/events")
+        .set(t.asAdmin)
+        .send({ ...validEvent, startDate: "2026-09-20", endDate: "2026-09-18" })
+        .expect(400);
+      const event = await make.event();
+      await t
+        .http()
+        .patch(`/admin/events/${event.id}`)
+        .set(t.asAdmin)
+        .send({ endDate: "2026-09-01" })
+        .expect(400);
+    });
+
     it("updates only the provided fields, including opening the event and the preferred station", async () => {
       const event = await make.event({ openToPaxs: false });
       const station = await make.station(event.id);

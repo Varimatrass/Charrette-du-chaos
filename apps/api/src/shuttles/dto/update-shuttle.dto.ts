@@ -1,3 +1,4 @@
+import { IsDay, IsTime } from "../../common/validation/date-time.js";
 import { OmitType, PartialType } from "@nestjs/mapped-types";
 import {
   IsIn,
@@ -40,8 +41,7 @@ export class UpdateShuttleDto
   label?: string;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsDay()
   day?: string;
 
   @IfPresent()
@@ -49,13 +49,11 @@ export class UpdateShuttleDto
   direction?: Direction;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsTime()
   departureTime?: string;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsTime()
   stationArrivalTime?: string;
 
   @IfPresent()

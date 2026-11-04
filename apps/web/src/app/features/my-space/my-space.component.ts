@@ -37,7 +37,7 @@ import { PaxApiService } from "../../core/api/pax-api.service";
 import { appLinks } from "../../core/app-paths";
 import { DIRECTIONS } from "../../core/labels";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
-import { emptyToNull, emptyToUndefined } from "../../core/utils/forms";
+import { emptyToNull, emptyToUndefined, toDateInputValue } from "../../core/utils/forms";
 import { CarFormComponent } from "../../shared/car-form/car-form.component";
 import { TripFormComponent } from "../../shared/trip-form/trip-form.component";
 
@@ -104,6 +104,9 @@ export class MySpaceComponent {
   readonly carForm = viewChild(CarFormComponent);
 
   readonly myCar = computed(() => this.pax()?.car ?? null);
+  /** Les créneaux de conduite sont forcément pendant l'évènement. */
+  readonly eventStart = computed(() => toDateInputValue(this.event()?.startDate) || null);
+  readonly eventEnd = computed(() => toDateInputValue(this.event()?.endDate) || null);
   readonly isDriverSomewhere = computed(() => this.tripForms().some((form) => form.isDriver()));
   readonly carSectionVisible = computed(
     () => !!this.myCar() || this.isDriverSomewhere() || this.showCarForm(),
@@ -328,9 +331,9 @@ export class MySpaceComponent {
           this.notify("Créneau ajouté.");
           this.loadMyAvailabilitySlots();
         },
-        error: () => {
+        error: (error: unknown) => {
           this.savingAvailabilitySlot.set(false);
-          this.notify("Échec de l'ajout, réessaie.", SNACKBAR_LONG_MS);
+          this.notify(this.errorMessage(error, "Échec de l'ajout, réessaie."), 5000);
         },
       });
   }

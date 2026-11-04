@@ -91,6 +91,24 @@ describe("Trips (e2e)", () => {
         .expect(400);
     });
 
+    it("keeps trip days coherent with the event and with each other (B9)", async () => {
+      const put = (direction: string, body: object) =>
+        t.http().put(`/pax/me/trips/${direction}`).set(t.asPax(token)).send(body);
+
+      await put("OUTBOUND", { mode: "TRAIN", time: "8h" }).expect(400);
+      const late = await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-21" }).expect(400);
+      expect(late.body.message).toMatch(/se termine le dimanche 20 septembre/);
+      await put("RETURN", { mode: "TRAIN", day: "2026-09-17" }).expect(400);
+
+      // Arriver en avance ou repartir plus tard, c'est possible.
+      await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-17" }).expect(200);
+      await put("RETURN", { mode: "TRAIN", day: "2026-09-22" }).expect(200);
+
+      await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-19" }).expect(200);
+      const before = await put("RETURN", { mode: "TRAIN", day: "2026-09-18" }).expect(400);
+      expect(before.body.message).toMatch(/avant ton arrivée/);
+    });
+
     it("requires a pax token", async () => {
       await t.http().put("/pax/me/trips/OUTBOUND").send({}).expect(401);
     });

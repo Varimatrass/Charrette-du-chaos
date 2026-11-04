@@ -183,7 +183,14 @@
         >
           <mat-form-field appearance="outline">
             <mat-label>Jour</mat-label>
-            <input matInput type="date" formControlName="day" required />
+            <input
+              matInput
+              type="date"
+              formControlName="day"
+              required
+              [attr.min]="eventStart()"
+              [attr.max]="eventEnd()"
+            />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>À partir de (optionnel)</mat-label>

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import type { Direction, IncompatiblePassenger } from "@desordre/shared-types";
 import type { Prisma, Shuttle } from "@prisma/client";
-import { toDate } from "../common/utils/dates.js";
+import { frenchEventRange, isoDay, isWithinEvent, toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -32,6 +32,7 @@ export class ShuttlesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateShuttleDto): Promise<Shuttle> {
+    await this.ensureDayInEvent(dto.eventId, toDate(dto.day));
     const driverPaxId = dto.driverPaxId || null;
     if (driverPaxId) await this.ensureDriverInEvent(dto.eventId, driverPaxId);
     return this.prisma.shuttle.create({
@@ -142,6 +143,8 @@ export class ShuttlesService {
     });
     if (!shuttle) throw new NotFoundException("Navette introuvable");
     if (changes.driverPaxId) await this.ensureDriverInEvent(shuttle.eventId, changes.driverPaxId);
+    if (changes.day !== undefined)
+      await this.ensureDayInEvent(shuttle.eventId, toDate(changes.day));
 
     const incompatible = findIncompatiblePassengers(shuttle, {
       direction: changes.direction,
@@ -176,13 +179,18 @@ export class ShuttlesService {
     return updated;
   }
 
-  private async ensureExists(id: string): Promise<{ id: string; eventId: string }> {
-    const shuttle = await this.prisma.shuttle.findUnique({
-      where: { id },
-      select: { id: true, eventId: true },
+  /** Une navette roule pendant l'évènement. */
+  private async ensureDayInEvent(eventId: string, day: Date): Promise<void> {
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      select: { startDate: true, endDate: true },
     });
-    if (!shuttle) throw new NotFoundException("Navette introuvable");
-    return shuttle;
+    if (!event) throw new BadRequestException("Cet évènement n'existe pas");
+    if (!isWithinEvent(event, day)) {
+      throw new BadRequestException(
+        `Une navette doit rouler pendant l'évènement (${frenchEventRange(event)})`,
+      );
+    }
   }
 
   /** Le/la conducteur·ice doit être un pax de l'évènement de la navette. */
@@ -243,8 +251,4 @@ export function findIncompatiblePassengers(
     );
   }
   return result;
-}
-
-function isoDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }
