@@ -28,6 +28,7 @@ export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
   [TripStatus.PENDING]: "En attente",
   [TripStatus.ASSIGNED]: "Assigné",
   [TripStatus.TO_RECHECK]: "À revérifier",
+  [TripStatus.NO_SHUTTLE]: "Sans navette",
 };
 
 export const WAIT_LEVEL_LABELS: Record<WaitLevel, string> = {

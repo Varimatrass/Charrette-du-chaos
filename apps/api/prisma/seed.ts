@@ -456,7 +456,7 @@ async function main(): Promise<void> {
           time: trip.time ?? null,
           stationId: trip.station ? stationIds.get(trip.station) : null,
           shuttleId: trip.shuttle ? shuttleIds[trip.shuttle] : null,
-          status: trip.status ?? "PENDING",
+          status: trip.status ?? (trip.mode === "TRAIN" ? "PENDING" : "NO_SHUTTLE"),
           comment: trip.comment ?? null,
           origin: trip.origin ?? null,
           carpoolRole: trip.carpoolRole ?? null,

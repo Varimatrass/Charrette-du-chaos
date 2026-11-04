@@ -24,6 +24,33 @@ export function statusAfterPaxEdit(current: TripStatus): TripStatus {
   return current === TripStatus.ASSIGNED ? TripStatus.TO_RECHECK : current;
 }
 
+/**
+ * Statut d'un trajet qui n'est dans aucune navette : en attente d'une navette
+ * s'il est en train, sinon il n'en a pas besoin (covoit, autre, indécis).
+ */
+export function statusWithoutShuttle(mode: TransportMode | null): TripStatus {
+  return mode === TransportMode.TRAIN ? TripStatus.PENDING : TripStatus.NO_SHUTTLE;
+}
+
+/** Les navettes sont réservées aux trajets en train. */
+export const SHUTTLE_TRAIN_ONLY_MESSAGE =
+  "Les navettes sont réservées aux paxs qui viennent en train";
+
+/** Jour au format "YYYY-MM-DD" pour comparer des colonnes `@db.Date`. */
+function isoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Jour lisible en français pour les messages d'erreur ("vendredi 12 juin"). */
+function frenchDay(date: Date): string {
+  return date.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
+
 /** Champs d'un trajet qui dépendent du mode de transport, remis à plat. */
 interface ModeFields {
   stationId: string | null;
@@ -81,14 +108,24 @@ export class TripsService {
             direction,
             eventId: pax.eventId,
             paxId: pax.id,
-            status: TripStatus.PENDING,
+            status: statusWithoutShuttle(fields.mode),
           },
         });
       }
 
+      // Quitter le train fait sortir de la navette : la place se libère et le
+      // trajet n'a plus besoin de navette. En train, une assignation existante
+      // est gardée mais marquée "à revérifier".
+      const keepsShuttle = fields.mode === TransportMode.TRAIN && existing.shuttleId !== null;
       return tx.trip.update({
         where: { id: existing.id },
-        data: { ...fields, status: statusAfterPaxEdit(existing.status) },
+        data: {
+          ...fields,
+          shuttleId: keepsShuttle ? existing.shuttleId : null,
+          status: keepsShuttle
+            ? statusAfterPaxEdit(existing.status)
+            : statusWithoutShuttle(fields.mode),
+        },
       });
     });
   }
@@ -158,8 +195,9 @@ export class TripsService {
 
   /**
    * Un pax se met lui/elle-même dans une navette (ou s'en retire avec
-   * `null`) : seulement pour SON trajet, seulement une navette de son
-   * évènement allant dans le même sens, et seulement s'il reste de la place.
+   * `null`) : seulement pour SON trajet en train, seulement une navette de
+   * son évènement allant dans le même sens, le même jour que son trajet (si
+   * iel l'a renseigné), et seulement s'il reste de la place.
    */
   async setMyShuttle(pax: Pax, direction: Direction, dto: SetMyShuttleDto): Promise<Trip> {
     const trip = await this.prisma.trip.findUnique({
@@ -170,8 +208,11 @@ export class TripsService {
     if (dto.shuttleId === null) {
       return this.prisma.trip.update({
         where: { id: trip.id },
-        data: { shuttleId: null, status: TripStatus.PENDING },
+        data: { shuttleId: null, status: statusWithoutShuttle(trip.mode) },
       });
+    }
+    if (trip.mode !== TransportMode.TRAIN) {
+      throw new BadRequestException(SHUTTLE_TRAIN_ONLY_MESSAGE);
     }
 
     const shuttleId = dto.shuttleId;
@@ -185,6 +226,11 @@ export class TripsService {
       }
       if (shuttle.direction !== direction) {
         throw new BadRequestException("Cette navette ne va pas dans le bon sens");
+      }
+      if (trip.day && isoDay(trip.day) !== isoDay(shuttle.day)) {
+        throw new BadRequestException(
+          `Cette navette roule le ${frenchDay(shuttle.day)}, or ton trajet est prévu le ${frenchDay(trip.day)}. Change le jour de ton trajet ou choisis une navette de ce jour-là.`,
+        );
       }
       if (trip.shuttleId !== shuttle.id && shuttle.remainingSeats <= 0) {
         throw new BadRequestException("Cette navette est pleine");
@@ -254,9 +300,16 @@ export class TripsService {
     }));
   }
 
-  /** Assigne (ou désassigne avec `shuttleId: null`) un trajet à une navette. Réservé à l'orga. */
+  /**
+   * Assigne (ou désassigne avec `shuttleId: null`) un trajet en train à une
+   * navette. Réservé à l'orga, qui peut surbooker une navette (pas de contrôle
+   * de places : l'affichage le signale) ou placer quelqu'un un autre jour.
+   */
   async assign(id: string, dto: AssignTripDto): Promise<Trip> {
     const trip = await this.findOneOrThrow(id);
+    if (dto.shuttleId && trip.mode !== TransportMode.TRAIN) {
+      throw new BadRequestException(SHUTTLE_TRAIN_ONLY_MESSAGE);
+    }
     if (dto.shuttleId) {
       const shuttle = await this.shuttlesService.findOneWithSeats(dto.shuttleId);
       if (!shuttle || shuttle.eventId !== trip.eventId) {
@@ -270,7 +323,7 @@ export class TripsService {
       where: { id },
       data: {
         shuttleId: dto.shuttleId,
-        status: dto.shuttleId ? TripStatus.ASSIGNED : TripStatus.PENDING,
+        status: dto.shuttleId ? TripStatus.ASSIGNED : statusWithoutShuttle(trip.mode),
       },
     });
   }

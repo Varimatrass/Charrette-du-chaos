@@ -24,10 +24,13 @@ enum TransportMode {
   OTHER
 }
 
+// PENDING / ASSIGNED / TO_RECHECK ne concernent que les trajets en train
+// (les seuls à avoir besoin d'une navette) ; tous les autres sont NO_SHUTTLE.
 enum TripStatus {
   PENDING
   ASSIGNED
   TO_RECHECK
+  NO_SHUTTLE
 }
 
 // Rôle d'un pax dans un covoiturage pour un trajet donné : conduit sa propre

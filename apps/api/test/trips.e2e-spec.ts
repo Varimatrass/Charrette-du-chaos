@@ -59,7 +59,7 @@ describe("Trips (e2e)", () => {
         .set(t.asPax(token))
         .send({})
         .expect(200);
-      expect(body).toMatchObject({ direction: "RETURN", mode: null, status: "PENDING" });
+      expect(body).toMatchObject({ direction: "RETURN", mode: null, status: "NO_SHUTTLE" });
     });
 
     it("marks an assigned trip as TO_RECHECK when the pax edits it, keeping the shuttle", async () => {
@@ -357,6 +357,62 @@ describe("Trips (e2e)", () => {
         .set(t.asPax(token))
         .send({ shuttleId: returnShuttle.id })
         .expect(404);
+    });
+  });
+
+  describe("shuttles are for trips by train only", () => {
+    it("leaving the train frees the shuttle seat and marks the trip NO_SHUTTLE (B2)", async () => {
+      const shuttle = await make.shuttle(eventId);
+      await make.trip(eventId, paxId, { shuttleId: shuttle.id, status: "ASSIGNED" });
+
+      const { body } = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", origin: "Lyon", carpoolRole: "PASSENGER" })
+        .expect(200);
+      expect(body).toMatchObject({ shuttleId: null, status: "NO_SHUTTLE" });
+
+      const train = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "TRAIN" })
+        .expect(200);
+      expect(train.body).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("a pax not coming by train cannot take a shuttle, neither can the admin place them (B3)", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const trip = await make.trip(eventId, paxId, { mode: "OTHER", status: "NO_SHUTTLE" });
+
+      const self = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+      expect(self.body.message).toMatch(/train/);
+
+      await t
+        .http()
+        .patch(`/admin/trips/${trip.id}/assign`)
+        .set(t.asAdmin)
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+    });
+
+    it("a pax cannot take a shuttle running another day than their trip (B7)", async () => {
+      const shuttle = await make.shuttle(eventId, { day: new Date("2026-07-10") });
+      await make.trip(eventId, paxId, { day: new Date("2026-07-11") });
+
+      const { body } = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+      expect(body.message).toMatch(/vendredi 10 juillet.*samedi 11 juillet/);
     });
   });
 

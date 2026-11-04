@@ -8,7 +8,7 @@ import { MatTableModule } from "@angular/material/table";
 import { HttpErrorResponse } from "@angular/common/http";
 import { forkJoin, of } from "rxjs";
 import { catchError } from "rxjs/operators";
-import { Direction, TripStatus, WaitLevel } from "@desordre/shared-types";
+import { Direction, TransportMode, TripStatus, WaitLevel } from "@desordre/shared-types";
 import type { ShuttleWithRemainingSeats, TripOverview, TripWithPax } from "@desordre/shared-types";
 import { AdminApiService } from "../../core/api/admin-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
@@ -23,6 +23,7 @@ interface TripRow {
   paxName: string;
   isMine: boolean;
   direction: Direction;
+  mode: TransportMode | null;
   summary: string;
   day: string | null;
   time: string | null;
@@ -87,17 +88,36 @@ export class TripsTableComponent {
     ),
   );
 
-  /** Navettes proposables pour la direction affichée ; les pleines restent visibles mais grisées côté pax. */
-  readonly shuttleOptions = computed<EntityOption[]>(() =>
-    this.shuttles()
-      .filter((shuttle) => shuttle.direction === this.direction())
-      .map((shuttle) => ({
-        id: shuttle.id,
-        label: shuttle.label,
-        hint: `${shuttle.departureTime} · ${shuttle.remainingSeats} place${shuttle.remainingSeats > 1 ? "s" : ""}`,
-        disabled: !this.isAdmin() && shuttle.remainingSeats <= 0,
-      })),
-  );
+  /**
+   * Navettes proposables pour chaque ligne qu'on peut modifier, dans la
+   * direction affichée. Côté pax, les pleines et celles d'un autre jour que
+   * son trajet restent visibles mais grisées (avec la raison) ; l'orga peut
+   * tout choisir (surbooking compris), le jour différent est juste signalé.
+   */
+  readonly shuttleOptionsByRow = computed(() => {
+    const options = new Map<string, EntityOption[]>();
+    const shuttles = this.shuttles().filter((shuttle) => shuttle.direction === this.direction());
+    for (const row of this.visibleRows()) {
+      if (!this.canAssign(row)) continue;
+      options.set(
+        row.id,
+        shuttles.map((shuttle) => {
+          const otherDay = !!row.day && sameDay(row.day, shuttle.day) === false;
+          const seats = shuttle.remainingSeats;
+          const seatsHint =
+            seats < 0 ? `surbookée (+${-seats})` : `${seats} place${seats > 1 ? "s" : ""}`;
+          const dayHint = otherDay ? ` · ${formatDay(shuttle.day)}, pas ton jour` : "";
+          return {
+            id: shuttle.id,
+            label: shuttle.label,
+            hint: `${formatDay(shuttle.day)} ${shuttle.departureTime} · ${seatsHint}${this.isAdmin() ? "" : dayHint}`,
+            disabled: !this.isAdmin() && shuttle.id !== row.shuttleId && (seats <= 0 || otherDay),
+          };
+        }),
+      );
+    }
+    return options;
+  });
 
   constructor() {
     effect(() => this.load(this.context()));
@@ -122,6 +142,7 @@ export class TripsTableComponent {
               paxName: trip.pax.name,
               isMine: false,
               direction: trip.direction,
+              mode: trip.mode,
               summary: summarizeTrip(trip, shuttlesById, carsById),
               day: trip.day,
               time: trip.time,
@@ -157,6 +178,7 @@ export class TripsTableComponent {
             paxName: trip.paxName,
             isMine: trip.paxId === context.myPaxId,
             direction: trip.direction,
+            mode: trip.mode,
             summary: summarizeTrip(trip, shuttlesById, carsById),
             day: trip.day,
             time: trip.time,
@@ -181,9 +203,12 @@ export class TripsTableComponent {
     this.statusFilter.set(status);
   }
 
-  /** Un pax ne peut changer de navette que pour son propre trajet ; l'orga pour tous. */
+  /**
+   * Les navettes sont réservées aux trajets en train. Un pax ne peut changer
+   * de navette que pour son propre trajet ; l'orga pour tous.
+   */
   canAssign(row: TripRow): boolean {
-    return this.isAdmin() || row.isMine;
+    return row.mode === TransportMode.TRAIN && (this.isAdmin() || row.isMine);
   }
 
   onShuttleChange(row: TripRow, shuttleId: string | null): void {
@@ -219,4 +244,19 @@ export class TripsTableComponent {
       this.load();
     });
   }
+}
+
+/** Compare deux dates ISO (avec ou sans heure) au jour près. */
+function sameDay(a: string, b: string): boolean {
+  return a.slice(0, 10) === b.slice(0, 10);
+}
+
+/** "ven. 18/09" : assez court pour tenir dans un indice de sélecteur. */
+function formatDay(isoDate: string): string {
+  return new Date(isoDate.slice(0, 10) + "T00:00:00Z").toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  });
 }

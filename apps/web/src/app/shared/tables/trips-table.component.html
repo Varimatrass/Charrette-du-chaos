@@ -9,6 +9,7 @@
     <mat-button-toggle [value]="TripStatus.PENDING">En attente</mat-button-toggle>
     <mat-button-toggle [value]="TripStatus.ASSIGNED">Assignés</mat-button-toggle>
     <mat-button-toggle [value]="TripStatus.TO_RECHECK">À revérifier</mat-button-toggle>
+    <mat-button-toggle [value]="TripStatus.NO_SHUTTLE">Sans navette</mat-button-toggle>
   </mat-button-toggle-group>
 </div>
 
@@ -76,7 +77,7 @@
             class="inline-select"
             emptyLabel="Aucune"
             placeholder="Choisir une navette"
-            [options]="shuttleOptions()"
+            [options]="shuttleOptionsByRow().get(t.id) ?? []"
             [value]="t.shuttleId"
             (valueChange)="onShuttleChange(t, $event)"
           />

@@ -35,11 +35,16 @@ export type TransportMode = (typeof TransportMode)[keyof typeof TransportMode];
  * Statut d'un trajet côté organisation des navettes.
  * Volontairement non bloquant pour le pax : un trajet "TO_RECHECK" reste
  * modifiable, ce statut sert seulement de signal pour les organisateur·ices.
+ *
+ * Les navettes ne concernent que les trajets en train : PENDING (cherche une
+ * navette), ASSIGNED et TO_RECHECK ne s'appliquent qu'à eux. Tous les autres
+ * trajets (covoit, autre, pas encore décidé) sont NO_SHUTTLE.
  */
 export const TripStatus = {
   PENDING: "PENDING",
   ASSIGNED: "ASSIGNED",
   TO_RECHECK: "TO_RECHECK",
+  NO_SHUTTLE: "NO_SHUTTLE",
 } as const;
 export type TripStatus = (typeof TripStatus)[keyof typeof TripStatus];
 

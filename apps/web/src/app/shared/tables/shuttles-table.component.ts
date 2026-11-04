@@ -11,7 +11,7 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { forkJoin, of } from "rxjs";
 import { catchError } from "rxjs/operators";
-import { Direction, WaitLevel } from "@desordre/shared-types";
+import { Direction, TransportMode, WaitLevel } from "@desordre/shared-types";
 import type {
   DriverAvailabilitySlotWithPax,
   ShuttleWithPassengerNames,
@@ -134,26 +134,33 @@ export class ShuttlesTableComponent {
   });
   private readonly formDay = signal("");
 
-  /** Trajets de la direction pas encore dans la navette en cours de modification. */
+  /**
+   * Trajets en train de la direction, pas encore dans la navette en cours de
+   * modification. Ceux du jour de la navette et sans navette d'abord (c'est
+   * eux qu'on cherche à placer) ; un autre jour reste possible mais signalé.
+   */
   readonly addablePassengerOptions = computed<EntityOption[]>(() => {
     const editing = this.editingShuttle();
     if (!editing) return [];
-    // Les trajets sans navette d'abord (c'est eux qu'on cherche à placer), puis les autres.
+    const shuttleDay = toDateInputValue(editing.day);
+    const isOtherDay = (trip: TripWithPax) =>
+      !!trip.day && toDateInputValue(trip.day) !== shuttleDay;
     return this.directionTrips()
-      .filter((trip) => trip.shuttleId !== editing.id)
+      .filter((trip) => trip.mode === TransportMode.TRAIN && trip.shuttleId !== editing.id)
       .sort(
         (a, b) =>
-          Number(!!a.shuttleId) - Number(!!b.shuttleId) || a.pax.name.localeCompare(b.pax.name),
+          Number(isOtherDay(a)) - Number(isOtherDay(b)) ||
+          Number(!!a.shuttleId) - Number(!!b.shuttleId) ||
+          a.pax.name.localeCompare(b.pax.name),
       )
-      .map((trip) => ({
-        id: trip.id,
-        label: trip.pax.name,
-        hint: trip.shuttleId
-          ? "déjà dans une autre navette"
-          : trip.time
-            ? `train à ${trip.time}`
-            : undefined,
-      }));
+      .map((trip) => {
+        const hints = [
+          trip.time ? `train à ${trip.time}` : null,
+          isOtherDay(trip) ? "⚠ un autre jour" : null,
+          trip.shuttleId ? "déjà dans une autre navette" : null,
+        ].filter((hint) => hint !== null);
+        return { id: trip.id, label: trip.pax.name, hint: hints.join(" · ") || undefined };
+      });
   });
 
   constructor() {
