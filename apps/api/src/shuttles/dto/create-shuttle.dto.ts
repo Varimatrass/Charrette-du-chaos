@@ -1,5 +1,14 @@
 import { IsDay, IsTime } from "../../common/validation/date-time.js";
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  MaxLength,
+} from "class-validator";
 import { Direction } from "@desordre/shared-types";
 import type { CreateShuttleInput } from "@desordre/shared-types";
 
@@ -17,9 +26,16 @@ export class CreateShuttleDto implements CreateShuttleInput {
   @IsIn(Object.values(Direction))
   direction!: Direction;
 
+  /** Voiture de l'évènement utilisée pour la navette. */
+  @IsOptional()
+  @IsUUID()
+  vehicleCarId?: string;
+
+  /** Véhicule pas encore dans la liste : crée une voiture sans propriétaire (prioritaire). */
   @IsOptional()
   @IsString()
-  vehicle?: string;
+  @MaxLength(80)
+  newVehicleName?: string;
 
   @IsTime()
   departureTime!: string;

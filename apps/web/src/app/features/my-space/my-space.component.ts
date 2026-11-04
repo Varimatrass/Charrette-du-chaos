@@ -104,6 +104,8 @@ export class MySpaceComponent {
   readonly carForm = viewChild(CarFormComponent);
 
   readonly myCar = computed(() => this.pax()?.car ?? null);
+  /** Voitures déclarées par des passager·es sans propriétaire connu : peut-être la sienne. */
+  readonly ownerlessCars = computed(() => this.cars().filter((car) => car.owner === null));
   /** Les créneaux de conduite sont forcément pendant l'évènement. */
   readonly eventStart = computed(() => toDateInputValue(this.event()?.startDate) || null);
   readonly eventEnd = computed(() => toDateInputValue(this.event()?.endDate) || null);
@@ -278,6 +280,22 @@ export class MySpaceComponent {
       error: (error: unknown) => {
         this.savingCar.set(false);
         this.notify(this.errorMessage(error, "Échec de l'enregistrement, réessaie."), 6000);
+      },
+    });
+  }
+
+  /** "C'est la mienne" : revendiquer une voiture sans propriétaire. */
+  claimCar(carId: string, name: string): void {
+    this.savingCar.set(true);
+    this.paxApi.claimCar(this.token, carId).subscribe({
+      next: () => {
+        this.savingCar.set(false);
+        this.notify(`${name} est maintenant ta voiture.`, SNACKBAR_LONG_MS);
+        this.load();
+      },
+      error: (error: unknown) => {
+        this.savingCar.set(false);
+        this.notify(this.errorMessage(error, "Impossible de revendiquer cette voiture."), 5000);
       },
     });
   }

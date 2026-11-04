@@ -43,7 +43,7 @@ describe("TripsService", () => {
   const prisma = createPrismaMock();
   const stations = new StationsService(asPrismaService(prisma));
   const cars = new CarsService(asPrismaService(prisma));
-  const shuttles = new ShuttlesService(asPrismaService(prisma));
+  const shuttles = new ShuttlesService(asPrismaService(prisma), cars);
   const service = new TripsService(asPrismaService(prisma), stations, cars, shuttles);
   const pax = makePax();
 

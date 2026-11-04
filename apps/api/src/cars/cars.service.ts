@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Car, Pax, Prisma } from "@prisma/client";
-import { Direction } from "@desordre/shared-types";
+import { Direction, type VehicleLendingMode } from "@desordre/shared-types";
 import type { CarOverview, PassengerName } from "@desordre/shared-types";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { UpsertCarDto } from "./dto/upsert-car.dto.js";
@@ -26,7 +26,7 @@ export function toCarOverview(car: CarWithTrips): CarOverview {
     name: car.name,
     seats: car.seats,
     lendingMode: car.lendingMode,
-    owner: { id: car.ownerPax.id, name: car.ownerPax.name },
+    owner: car.ownerPax ? { id: car.ownerPax.id, name: car.ownerPax.name } : null,
     passengers,
     remainingSeats: {
       OUTBOUND: car.seats - passengers.OUTBOUND.length,
@@ -87,6 +87,56 @@ export class CarsService {
     ]);
   }
 
+  /**
+   * Voiture sans propriétaire : celle d'un·e conducteur·ice pas inscrit·e
+   * (déclarée par un·e de ses passager·es) ou un véhicule de l'orga pour une
+   * navette. Si une voiture sans propriétaire porte déjà ce nom dans
+   * l'évènement, on la reprend : deux passager·es de la même voiture qui
+   * tapent le même nom se retrouvent dedans ensemble.
+   */
+  async findOrCreateOwnerless(
+    eventId: string,
+    rawName: string,
+    seats: number,
+    lendingMode: VehicleLendingMode,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<Car> {
+    const name = normalizeCarName(rawName);
+    if (!name) throw new BadRequestException("Le nom de la voiture est vide");
+    const existing = await db.car.findFirst({
+      where: { eventId, ownerPaxId: null, name: { equals: name, mode: "insensitive" } },
+    });
+    if (existing) return existing;
+    return db.car.create({ data: { eventId, ownerPaxId: null, name, seats, lendingMode } });
+  }
+
+  /**
+   * Un pax revendique une voiture sans propriétaire ("c'est la mienne") : iel
+   * en devient le/la propriétaire. S'iel s'y était déclaré·e passager·e, iel
+   * en devient le/la conducteur·ice pour ces trajets.
+   */
+  async claim(pax: Pax, carId: string): Promise<Car> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM cars WHERE id = ${carId} FOR UPDATE`;
+      const car = await tx.car.findUnique({ where: { id: carId } });
+      if (!car || car.eventId !== pax.eventId) {
+        throw new NotFoundException("Cette voiture n'existe pas dans cet évènement");
+      }
+      if (car.ownerPaxId) throw new BadRequestException("Cette voiture a déjà un·e propriétaire");
+      if (await tx.car.findUnique({ where: { ownerPaxId: pax.id } })) {
+        throw new BadRequestException(
+          "Tu as déjà une voiture déclarée : retire-la d'abord si c'est celle-ci",
+        );
+      }
+      await tx.trip.updateMany({
+        where: { paxId: pax.id, carId, carpoolRole: "PASSENGER" },
+        data: { carpoolRole: "DRIVER", lookingForCarpool: false },
+      });
+      await tx.pax.update({ where: { id: pax.id }, data: { hasVehicle: true } });
+      return tx.car.update({ where: { id: carId }, data: { ownerPaxId: pax.id } });
+    });
+  }
+
   /** Toutes les voitures de l'évènement, avec les places restantes par direction. */
   async findAllForEventOverview(eventId: string): Promise<CarOverview[]> {
     const cars = await this.prisma.car.findMany({
@@ -131,4 +181,9 @@ export class CarsService {
     }
     return car;
   }
+}
+
+/** Normalise un nom de voiture saisi : espaces superflus retirés. */
+export function normalizeCarName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
 }

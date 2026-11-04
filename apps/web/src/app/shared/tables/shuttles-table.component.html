@@ -45,10 +45,19 @@
       [(value)]="driverPaxId"
       hint="Les pax partant·es pour conduire ce jour-là sont en tête de liste."
     />
-    <mat-form-field appearance="outline">
-      <mat-label>Véhicule</mat-label>
-      <input matInput formControlName="vehicle" />
-    </mat-form-field>
+    <app-entity-select
+      label="Véhicule"
+      emptyLabel="Pas encore choisi"
+      [options]="vehicleOptions()"
+      [(value)]="vehicleCarId"
+      [allowCreate]="true"
+      createLabel="Ajouter le véhicule"
+      hint="Une voiture de l'évènement, ou tape le nom d'un véhicule qui n'y est pas."
+      (create)="onCreateVehicle($event)"
+    />
+    @if (vehicleWarning(); as warning) {
+      <p class="notice notice-warn full-width">⚠ {{ warning }}</p>
+    }
     <mat-form-field appearance="outline">
       <mat-label>Heure de départ (du lieu)</mat-label>
       <input matInput type="time" formControlName="departureTime" />
@@ -169,8 +178,8 @@
       <th mat-header-cell *matHeaderCellDef>Conducteur·ice</th>
       <td mat-cell *matCellDef="let s">
         {{ s.driverPax?.name || "?" }}
-        @if (s.vehicle) {
-          <span class="secondary">({{ s.vehicle }})</span>
+        @if (s.vehicleCar) {
+          <span class="secondary">({{ s.vehicleCar.name }})</span>
         }
         @if (s.driverContactPhone) {
           <br />

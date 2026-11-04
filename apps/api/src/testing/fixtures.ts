@@ -65,7 +65,7 @@ export function makeShuttle(overrides: Partial<Shuttle> = {}): Shuttle {
     label: "Navette gare — matin",
     day: new Date("2026-09-18"),
     direction: "OUTBOUND",
-    vehicle: "Kangoo",
+    vehicleCarId: null,
     departureTime: "08:00",
     stationArrivalTime: "08:25",
     venueReturnTime: "08:50",

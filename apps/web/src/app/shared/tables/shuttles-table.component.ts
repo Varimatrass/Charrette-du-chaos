@@ -11,12 +11,14 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { forkJoin, of } from "rxjs";
 import { catchError } from "rxjs/operators";
-import { Direction, TransportMode, WaitLevel } from "@desordre/shared-types";
+import { Direction, TransportMode, VehicleLendingMode, WaitLevel } from "@desordre/shared-types";
+import { VEHICLE_LENDING_MODE_LABELS } from "../../core/labels";
 import type {
   DriverAvailabilitySlotWithPax,
   ShuttleWithPassengerNames,
   ShuttleWithPassengers,
   ShuttleWithRemainingSeats,
+  CarOverview,
   ShuttleIncompatibilityReason,
   ShuttleUpdateConflict,
   TripWithPax,
@@ -36,6 +38,16 @@ import { EntityOption, EntitySelectComponent } from "../entity-select/entity-sel
 import { DIRECTIONS, TableContext } from "./table-role";
 
 const DEFAULT_CAPACITY = 4;
+
+/** Préfixe d'un véhicule tapé mais pas encore créé (envoyé via `newVehicleName`). */
+const NEW_VEHICLE_PREFIX = "new:";
+
+/** Les voitures prêtées pour les navettes d'abord dans la liste. */
+const LENDING_ORDER: Record<VehicleLendingMode, number> = {
+  AVAILABLE_ANY_DRIVER: 0,
+  ONLY_IF_OWNER_DRIVES: 1,
+  NOT_AVAILABLE: 2,
+};
 
 const INCOMPATIBILITY_LABELS: Record<ShuttleIncompatibilityReason, string> = {
   DIRECTION: "la navette ne va plus dans le sens de son trajet",
@@ -114,12 +126,15 @@ export class ShuttlesTableComponent {
   readonly availabilitySlots = signal<DriverAvailabilitySlotWithPax[]>([]);
   readonly directionTrips = signal<TripWithPax[]>([]);
   readonly driverPaxId = signal<string | null>(null);
+  /** Véhicule choisi : l'id d'une voiture, ou `new:<nom>` pour un véhicule tapé. */
+  readonly vehicleCarId = signal<string | null>(null);
+  private readonly newVehicleName = signal<string | null>(null);
+  readonly eventCars = signal<CarOverview[]>([]);
   readonly passengerToAdd = signal<string | null>(null);
 
   readonly form = new FormGroup({
     label: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     day: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
-    vehicle: new FormControl("", { nonNullable: true }),
     departureTime: new FormControl("", { nonNullable: true, validators: [Validators.required] }),
     stationArrivalTime: new FormControl("", {
       nonNullable: true,
@@ -157,6 +172,48 @@ export class ShuttlesTableComponent {
       .map(({ available: _available, ...option }) => option);
   });
   private readonly formDay = signal("");
+
+  /**
+   * Véhicules proposables : les voitures de l'évènement, celles prêtées pour
+   * les navettes d'abord. Une voiture "pas prêtée" reste choisissable (l'orga
+   * a le dernier mot) mais c'est indiqué.
+   */
+  readonly vehicleOptions = computed<EntityOption[]>(() => {
+    const options: EntityOption[] = [...this.eventCars()]
+      .sort(
+        (a, b) =>
+          LENDING_ORDER[a.lendingMode] - LENDING_ORDER[b.lendingMode] ||
+          a.name.localeCompare(b.name),
+      )
+      .map((car) => ({
+        id: car.id,
+        label: car.owner ? `${car.name} — ${car.owner.name}` : car.name,
+        hint: car.owner
+          ? VEHICLE_LENDING_MODE_LABELS[car.lendingMode].toLowerCase()
+          : "véhicule sans propriétaire",
+      }));
+    const pending = this.newVehicleName();
+    if (pending) {
+      options.push({ id: NEW_VEHICLE_PREFIX + pending, label: pending, hint: "nouveau véhicule" });
+    }
+    return options;
+  });
+
+  /** Alerte (non bloquante) si le véhicule choisi n'est pas prêté dans ces conditions. */
+  readonly vehicleWarning = computed<string | null>(() => {
+    const car = this.eventCars().find((c) => c.id === this.vehicleCarId());
+    if (!car?.owner) return null;
+    if (car.lendingMode === VehicleLendingMode.NOT_AVAILABLE) {
+      return `${car.owner.name} n'a pas proposé de prêter sa voiture pour les navettes.`;
+    }
+    if (
+      car.lendingMode === VehicleLendingMode.ONLY_IF_OWNER_DRIVES &&
+      this.driverPaxId() !== car.owner.id
+    ) {
+      return `${car.owner.name} ne prête sa voiture que si c'est iel qui conduit.`;
+    }
+    return null;
+  });
 
   /**
    * Trajets en train de la direction, pas encore dans la navette en cours de
@@ -199,9 +256,11 @@ export class ShuttlesTableComponent {
         shuttles: this.adminApi.listShuttles(context.eventId),
         paxs: this.adminApi.listPaxs(context.eventId),
         slots: this.adminApi.listAvailabilitySlots(context.eventId).pipe(catchError(() => of([]))),
+        cars: this.adminApi.listCars(context.eventId).pipe(catchError(() => of([]))),
       }).subscribe({
-        next: ({ shuttles, paxs, slots }) => {
+        next: ({ shuttles, paxs, slots, cars }) => {
           this.shuttles.set(shuttles);
+          this.eventCars.set(cars);
           this.eventPaxs.set(paxs);
           this.availabilitySlots.set(slots);
           this.loading.set(false);
@@ -234,6 +293,8 @@ export class ShuttlesTableComponent {
     this.editingShuttleId.set(null);
     this.editingShuttle.set(null);
     this.driverPaxId.set(null);
+    this.vehicleCarId.set(null);
+    this.newVehicleName.set(null);
     this.form.reset();
     this.showForm.set(true);
   }
@@ -241,10 +302,11 @@ export class ShuttlesTableComponent {
   openEditForm(shuttle: ShuttleRow): void {
     this.editingShuttleId.set(shuttle.id);
     this.driverPaxId.set(shuttle.driverPaxId);
+    this.vehicleCarId.set(shuttle.vehicleCarId);
+    this.newVehicleName.set(null);
     this.form.setValue({
       label: shuttle.label,
       day: toDateInputValue(shuttle.day),
-      vehicle: shuttle.vehicle ?? "",
       departureTime: shuttle.departureTime,
       stationArrivalTime: shuttle.stationArrivalTime,
       venueReturnTime: shuttle.venueReturnTime ?? "",
@@ -287,8 +349,12 @@ export class ShuttlesTableComponent {
       stationArrivalTime: values.stationArrivalTime,
       capacity: values.capacity,
     };
+    const vehicle = this.vehicleCarId();
+    const newVehicleName = vehicle?.startsWith(NEW_VEHICLE_PREFIX)
+      ? vehicle.slice(NEW_VEHICLE_PREFIX.length)
+      : undefined;
     const optional = {
-      vehicle: values.vehicle,
+      vehicleCarId: newVehicleName ? "" : (vehicle ?? ""),
       venueReturnTime: values.venueReturnTime,
       comment: values.comment,
       driverPaxId: this.driverPaxId() ?? "",
@@ -296,7 +362,12 @@ export class ShuttlesTableComponent {
 
     const editingId = this.editingShuttleId();
     if (editingId) {
-      this.saveChanges(editingId, { ...required, ...mapValues(optional, emptyToNull) });
+      const changes: UpdateShuttleInput = { ...required, ...mapValues(optional, emptyToNull) };
+      if (newVehicleName) {
+        delete changes.vehicleCarId;
+        changes.newVehicleName = newVehicleName;
+      }
+      this.saveChanges(editingId, changes);
       return;
     }
     this.adminApi
@@ -304,6 +375,7 @@ export class ShuttlesTableComponent {
         eventId: this.context().eventId ?? "",
         ...required,
         ...mapValues(optional, emptyToUndefined),
+        newVehicleName,
       })
       .subscribe({
         next: () => this.afterSave("Navette créée."),
@@ -386,6 +458,11 @@ export class ShuttlesTableComponent {
           error: (error: unknown) => this.notifyError(error, "Impossible de supprimer la navette."),
         });
       });
+  }
+
+  onCreateVehicle(name: string): void {
+    this.newVehicleName.set(name);
+    this.vehicleCarId.set(NEW_VEHICLE_PREFIX + name);
   }
 
   addPassenger(): void {

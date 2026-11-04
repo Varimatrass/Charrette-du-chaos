@@ -66,6 +66,13 @@ export class PaxApiService {
     return this.http.delete<void>(apiUrl("pax/me/car"), { headers: paxTokenHeaders(token) });
   }
 
+  /** Revendiquer une voiture sans propriétaire ("c'est la mienne"). */
+  claimCar(token: string, carId: string): Observable<Car> {
+    return this.http.post<Car>(apiUrl(`pax/me/cars/${carId}/claim`), null, {
+      headers: paxTokenHeaders(token),
+    });
+  }
+
   /** Voitures de son évènement, pour choisir celle où l'on a une place. */
   listMyEventCars(token: string): Observable<CarOverview[]> {
     return this.http.get<CarOverview[]>(apiUrl("pax/me/cars"), { headers: paxTokenHeaders(token) });

@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { Direction, IncompatiblePassenger } from "@desordre/shared-types";
+import { VehicleLendingMode } from "@desordre/shared-types";
+import type { Direction, IncompatiblePassenger, ShuttleVehicle } from "@desordre/shared-types";
+import { CarsService } from "../cars/cars.service.js";
 import type { Prisma, Shuttle } from "@prisma/client";
 import { frenchEventRange, isoDay, isWithinEvent, toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
@@ -19,6 +21,30 @@ const SHUTTLES_ORDER = [{ day: "asc" }, { departureTime: "asc" }] as const;
 /** Ce qu'on expose du/de la conducteur·ice dans les listes : juste de quoi l'identifier. */
 const DRIVER_SELECT = { select: { id: true, name: true } } as const;
 
+/** Le véhicule d'une navette : son nom, sa nuance de prêt, et le nom de son/sa propriétaire. */
+const VEHICLE_SELECT = {
+  select: {
+    id: true,
+    name: true,
+    lendingMode: true,
+    ownerPaxId: true,
+    ownerPax: { select: { name: true } },
+  },
+} as const;
+
+type VehicleRow = Prisma.CarGetPayload<typeof VEHICLE_SELECT>;
+
+function toShuttleVehicle(car: VehicleRow | null): ShuttleVehicle | null {
+  if (!car) return null;
+  return {
+    id: car.id,
+    name: car.name,
+    lendingMode: car.lendingMode,
+    ownerPaxId: car.ownerPaxId,
+    ownerName: car.ownerPax?.name ?? null,
+  };
+}
+
 /**
  * Places restantes = capacité − nombre de trajets assignés. Négatif quand
  * l'orga a surbooké la navette (permis, mais affiché en rouge).
@@ -29,27 +55,76 @@ export function remainingSeats(capacity: number, assignedTrips: number): number 
 
 @Injectable()
 export class ShuttlesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly carsService: CarsService,
+  ) {}
 
   async create(dto: CreateShuttleDto): Promise<Shuttle> {
+    const { newVehicleName, vehicleCarId, ...fields } = dto;
     await this.ensureDayInEvent(dto.eventId, toDate(dto.day));
     const driverPaxId = dto.driverPaxId || null;
     if (driverPaxId) await this.ensureDriverInEvent(dto.eventId, driverPaxId);
     return this.prisma.shuttle.create({
-      data: { ...dto, day: toDate(dto.day), driverPaxId },
+      data: {
+        ...fields,
+        day: toDate(dto.day),
+        driverPaxId,
+        vehicleCarId: await this.resolveVehicle(dto.eventId, dto.capacity, {
+          newVehicleName,
+          vehicleCarId,
+        }),
+      },
     });
+  }
+
+  /**
+   * Le véhicule d'une navette est une voiture de l'évènement. Un nom de
+   * véhicule pas encore dans la liste crée une voiture sans propriétaire,
+   * prêtable à tout le monde, avec la capacité de la navette.
+   * `undefined` = pas touché, `null` = plus de véhicule.
+   */
+  private async resolveVehicle(
+    eventId: string,
+    capacity: number,
+    input: { newVehicleName?: string; vehicleCarId?: string | null },
+  ): Promise<string | null | undefined> {
+    if (input.newVehicleName?.trim()) {
+      const car = await this.carsService.findOrCreateOwnerless(
+        eventId,
+        input.newVehicleName,
+        capacity,
+        VehicleLendingMode.AVAILABLE_ANY_DRIVER,
+      );
+      return car.id;
+    }
+    if (input.vehicleCarId === undefined) return undefined;
+    if (!input.vehicleCarId) return null;
+    const car = await this.prisma.car.findUnique({
+      where: { id: input.vehicleCarId },
+      select: { eventId: true },
+    });
+    if (!car || car.eventId !== eventId) {
+      throw new BadRequestException("Ce véhicule n'est pas une voiture de cet évènement");
+    }
+    return input.vehicleCarId;
   }
 
   /** Navettes d'un évènement avec leurs places restantes et leur conducteur·ice (nom). */
   async findAllForEvent(eventId: string) {
     const shuttles = await this.prisma.shuttle.findMany({
       where: { eventId },
-      include: { _count: { select: { trips: true } }, driverPax: DRIVER_SELECT },
+      include: {
+        _count: { select: { trips: true } },
+        driverPax: DRIVER_SELECT,
+        vehicleCar: VEHICLE_SELECT,
+      },
       orderBy: [...SHUTTLES_ORDER],
     });
 
-    return shuttles.map(({ _count, ...shuttle }) => ({
+    return shuttles.map(({ _count, vehicleCar, ...shuttle }) => ({
       ...shuttle,
+      vehicleCar: toShuttleVehicle(vehicleCar),
       remainingSeats: remainingSeats(shuttle.capacity, _count.trips),
     }));
   }
@@ -85,17 +160,19 @@ export class ShuttlesService {
       include: {
         trips: { select: { pax: { select: { id: true, name: true } } } },
         driverPax: { select: { id: true, name: true, contactPhone: true } },
+        vehicleCar: VEHICLE_SELECT,
       },
       orderBy: [...SHUTTLES_ORDER],
     });
 
-    return shuttles.map(({ trips, driverPax, ...shuttle }) => {
+    return shuttles.map(({ trips, driverPax, vehicleCar, ...shuttle }) => {
       const passengers = trips.map(({ pax }) => ({ paxId: pax.id, name: pax.name }));
       const isPassenger = passengers.some((passenger) => passenger.paxId === requestingPaxId);
 
       return {
         ...shuttle,
         driverPax: driverPax ? { id: driverPax.id, name: driverPax.name } : null,
+        vehicleCar: toShuttleVehicle(vehicleCar),
         remainingSeats: remainingSeats(shuttle.capacity, trips.length),
         passengers,
         driverContactPhone: isPassenger ? (driverPax?.contactPhone ?? null) : null,
@@ -107,11 +184,15 @@ export class ShuttlesService {
   async findOne(id: string) {
     const shuttle = await this.prisma.shuttle.findUnique({
       where: { id },
-      include: { trips: { include: { pax: true, station: true } }, driverPax: DRIVER_SELECT },
+      include: {
+        trips: { include: { pax: true, station: true } },
+        driverPax: DRIVER_SELECT,
+        vehicleCar: VEHICLE_SELECT,
+      },
     });
     if (!shuttle) throw new NotFoundException("Navette introuvable");
 
-    const { trips, ...rest } = shuttle;
+    const { trips, vehicleCar, ...rest } = shuttle;
     const passengers = trips.map((trip) => ({
       ...trip,
       waitLevel: computeWaitLevel(trip.direction, trip.time, shuttle.stationArrivalTime),
@@ -119,6 +200,7 @@ export class ShuttlesService {
 
     return {
       ...rest,
+      vehicleCar: toShuttleVehicle(vehicleCar),
       passengers,
       remainingSeats: remainingSeats(shuttle.capacity, trips.length),
     };
@@ -132,7 +214,7 @@ export class ShuttlesService {
    * (leur trajet repasse "en attente").
    */
   async update(id: string, dto: UpdateShuttleDto): Promise<Shuttle> {
-    const { removeIncompatible, ...changes } = dto;
+    const { removeIncompatible, newVehicleName, vehicleCarId, ...changes } = dto;
     const shuttle = await this.prisma.shuttle.findUnique({
       where: { id },
       include: {
@@ -161,6 +243,11 @@ export class ShuttlesService {
 
     const data = omitUndefined({
       ...changes,
+      vehicleCarId: await this.resolveVehicle(
+        shuttle.eventId,
+        changes.capacity ?? shuttle.capacity,
+        { newVehicleName, vehicleCarId },
+      ),
       day: changes.day === undefined ? undefined : toDate(changes.day),
       // Le lien vers un pax est une clé étrangère : contrairement aux
       // autres champs texte optionnels, une chaîne vide ne veut rien dire

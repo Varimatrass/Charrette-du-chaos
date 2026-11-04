@@ -52,9 +52,18 @@
           label="Dans quelle voiture ?"
           [options]="carOptions()"
           [(value)]="carId"
+          [allowCreate]="true"
+          createLabel="Ajouter la voiture"
           emptyLabel="La voiture n'est pas encore dans la liste"
-          hint="Si la voiture n'est pas encore déclarée, laisse vide : tu pourras revenir la choisir plus tard."
+          hint="Pas dans la liste ? Tape son nom (ex : « Clio de Lou ») pour l'ajouter : son/sa conducteur·ice pourra la revendiquer en s'inscrivant."
+          (create)="onCreateCar($event)"
         />
+        @if (isNewCar()) {
+          <mat-form-field appearance="outline">
+            <mat-label>Places pour les passager·es (toi compris·e)</mat-label>
+            <input matInput type="number" min="1" max="20" [formControl]="newCarSeats" />
+          </mat-form-field>
+        }
       }
     }
   }

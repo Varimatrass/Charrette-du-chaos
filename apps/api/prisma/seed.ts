@@ -81,6 +81,7 @@ const SHUTTLES: Record<
     direction: Direction;
     /** Nom du pax conducteur·ice (doit exister dans PAXS). */
     driver: string;
+    /** Véhicule de l'orga (voiture sans propriétaire, créée une fois par nom). */
     vehicle: string;
     departureTime: string;
     stationArrivalTime: string;
@@ -426,11 +427,26 @@ async function main(): Promise<void> {
   }
 
   const shuttleIds = {} as Record<ShuttleKey, string>;
+  const vehicleIds = new Map<string, string>();
   for (const [key, shuttle] of Object.entries(SHUTTLES) as [
     ShuttleKey,
     (typeof SHUTTLES)[ShuttleKey],
   ][]) {
-    const { driver, ...data } = shuttle;
+    const { driver, vehicle, ...data } = shuttle;
+    let vehicleCarId = vehicleIds.get(vehicle);
+    if (!vehicleCarId) {
+      const car = await prisma.car.create({
+        data: {
+          eventId: event.id,
+          ownerPaxId: null,
+          name: vehicle,
+          seats: 4,
+          lendingMode: "AVAILABLE_ANY_DRIVER",
+        },
+      });
+      vehicleCarId = car.id;
+      vehicleIds.set(vehicle, vehicleCarId);
+    }
     const created = await prisma.shuttle.create({
       data: {
         eventId: event.id,
@@ -438,6 +454,7 @@ async function main(): Promise<void> {
         day: new Date(shuttle.day),
         capacity: 4,
         driverPaxId: paxIds.get(driver),
+        vehicleCarId,
       },
     });
     shuttleIds[key] = created.id;

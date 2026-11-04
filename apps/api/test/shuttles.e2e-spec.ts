@@ -182,17 +182,21 @@ describe("Shuttles (e2e)", () => {
 
     it("updates provided fields, clears optional ones with null, and refuses to null a required one", async () => {
       const driver = await make.pax(eventId);
-      const shuttle = await make.shuttle(eventId, { vehicle: "Kangoo", driverPaxId: driver.id });
+      const kangoo = await make.car(eventId, null, { name: "Kangoo" });
+      const shuttle = await make.shuttle(eventId, {
+        vehicleCarId: kangoo.id,
+        driverPaxId: driver.id,
+      });
 
       const { body } = await t
         .http()
         .patch(`/admin/shuttles/${shuttle.id}`)
         .set(t.asAdmin)
-        .send({ label: "Renommée", vehicle: null, driverPaxId: null })
+        .send({ label: "Renommée", vehicleCarId: null, driverPaxId: null })
         .expect(200);
       expect(body).toMatchObject({
         label: "Renommée",
-        vehicle: null,
+        vehicleCarId: null,
         driverPaxId: null,
         capacity: 4,
       });
@@ -273,6 +277,63 @@ describe("Shuttles (e2e)", () => {
         .expect(409);
       expect(body.incompatible).toHaveLength(1);
       expect(body.incompatible[0].reason).toBe("DIRECTION");
+    });
+  });
+
+  describe("shuttle vehicle = a car of the event (Q6)", () => {
+    it("links an existing car, or creates an ownerless one from a new name (reused if typed again)", async () => {
+      const owner = await make.pax(eventId, { name: "Fanta" });
+      const clio = await make.car(eventId, owner.id, {
+        name: "Clio",
+        lendingMode: "ONLY_IF_OWNER_DRIVES",
+      });
+      const linked = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), vehicleCarId: clio.id })
+        .expect(201);
+      expect(linked.body.vehicleCarId).toBe(clio.id);
+
+      const created = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), capacity: 7, newVehicleName: "  Camion  de la ferme " })
+        .expect(201);
+      const truck = await t.prisma.car.findUniqueOrThrow({
+        where: { id: created.body.vehicleCarId },
+      });
+      expect(truck).toMatchObject({
+        name: "Camion de la ferme",
+        ownerPaxId: null,
+        seats: 7,
+        lendingMode: "AVAILABLE_ANY_DRIVER",
+      });
+      const again = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), newVehicleName: "camion de la ferme" })
+        .expect(201);
+      expect(again.body.vehicleCarId).toBe(truck.id);
+
+      const list = await t.http().get(`/admin/shuttles?eventId=${eventId}`).set(t.asAdmin);
+      const withClio = list.body.find((s: { id: string }) => s.id === linked.body.id);
+      expect(withClio.vehicleCar).toMatchObject({
+        name: "Clio",
+        ownerName: "Fanta",
+        lendingMode: "ONLY_IF_OWNER_DRIVES",
+      });
+
+      const otherEvent = await make.event({ name: "Autre" });
+      const foreign = await make.car(otherEvent.id, null);
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), vehicleCarId: foreign.id })
+        .expect(400);
     });
   });
 

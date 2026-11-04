@@ -1,6 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Pax, Prisma, Trip } from "@prisma/client";
-import { CarpoolRole, Direction, TransportMode, TripStatus } from "@desordre/shared-types";
+import {
+  CarpoolRole,
+  Direction,
+  TransportMode,
+  TripStatus,
+  VehicleLendingMode,
+} from "@desordre/shared-types";
 import { frenchDay, isoDay, toDate, toDateOrNull } from "../common/utils/dates.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
 import { CarsService } from "../cars/cars.service.js";
@@ -11,6 +17,9 @@ import { AssignTripDto } from "./dto/assign-trip.dto.js";
 import { SetMyShuttleDto } from "./dto/set-my-shuttle.dto.js";
 import { SetTripStatusDto } from "./dto/set-trip-status.dto.js";
 import { UpsertTripDto } from "./dto/upsert-trip.dto.js";
+
+/** Places passager·es d'une voiture créée par un·e passager·e qui ne les connaît pas. */
+const DEFAULT_NEW_CAR_SEATS = 3;
 
 /** Tri chronologique commun à toutes les listes de trajets. */
 const TRIPS_ORDER = [{ day: "asc" }, { time: "asc" }] as const;
@@ -201,13 +210,26 @@ export class TripsService {
         };
       }
       if (dto.carpoolRole === CarpoolRole.PASSENGER) {
-        if (dto.carId) {
-          await this.carsService.ensureSeatAvailable(pax, dto.carId, direction, tx);
+        // Voiture pas encore dans la liste (conducteur·ice pas inscrit·e) :
+        // on la crée sans propriétaire, quelqu'un pourra la revendiquer.
+        const carId = dto.newCarName?.trim()
+          ? (
+              await this.carsService.findOrCreateOwnerless(
+                pax.eventId,
+                dto.newCarName,
+                dto.newCarSeats ?? DEFAULT_NEW_CAR_SEATS,
+                VehicleLendingMode.NOT_AVAILABLE,
+                tx,
+              )
+            ).id
+          : dto.carId;
+        if (carId) {
+          await this.carsService.ensureSeatAvailable(pax, carId, direction, tx);
           return {
             stationId: null,
             origin,
             carpoolRole: CarpoolRole.PASSENGER,
-            carId: dto.carId,
+            carId,
             lookingForCarpool: false,
           };
         }

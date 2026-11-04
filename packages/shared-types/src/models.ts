@@ -42,11 +42,16 @@ export interface Station {
   updatedAt: string;
 }
 
-/** Voiture d'un pax venant en covoiturage : au plus une par pax et par évènement. */
+/**
+ * Voiture d'un pax venant en covoiturage : au plus une par pax et par évènement.
+ * Peut n'appartenir à personne (`ownerPaxId` null) : créée par un pax passager·e
+ * d'un·e conducteur·ice pas inscrit·e, ou par l'orga pour une navette. Un pax
+ * peut ensuite la revendiquer.
+ */
 export interface Car {
   id: string;
   eventId: string;
-  ownerPaxId: string;
+  ownerPaxId: string | null;
   name: string;
   /** Places disponibles pour des passager·es (hors conducteur·ice). */
   seats: number;
@@ -64,7 +69,8 @@ export interface CarOverview {
   name: string;
   seats: number;
   lendingMode: VehicleLendingMode;
-  owner: { id: string; name: string };
+  /** `null` = voiture sans propriétaire (conducteur·ice pas inscrit·e, ou véhicule de l'orga). */
+  owner: { id: string; name: string } | null;
   /** Passager·es déjà déclaré·es, par direction. */
   passengers: Record<Direction, PassengerName[]>;
   remainingSeats: Record<Direction, number>;
@@ -132,7 +138,8 @@ export interface Shuttle {
   label: string;
   day: IsoDate;
   direction: Direction;
-  vehicle: string | null;
+  /** Véhicule utilisé : une voiture de l'évènement (prêtée par un pax, ou sans propriétaire). */
+  vehicleCarId: string | null;
   departureTime: IsoTime;
   stationArrivalTime: IsoTime;
   venueReturnTime: IsoTime | null;
@@ -151,10 +158,21 @@ export interface TripWithPax extends Trip {
   waitLevel: WaitLevel | null;
 }
 
-/** Une navette avec ses places restantes calculées et le nom de son/sa conducteur·ice. */
+/** Le véhicule d'une navette tel qu'affiché : son nom, à qui il est, s'il est prêté. */
+export interface ShuttleVehicle {
+  id: string;
+  name: string;
+  /** `null` = voiture sans propriétaire. */
+  ownerPaxId: string | null;
+  ownerName: string | null;
+  lendingMode: VehicleLendingMode;
+}
+
+/** Une navette avec ses places restantes calculées, le nom de son/sa conducteur·ice et son véhicule. */
 export interface ShuttleWithRemainingSeats extends Shuttle {
   remainingSeats: number;
   driverPax: { id: string; name: string } | null;
+  vehicleCar: ShuttleVehicle | null;
 }
 
 /**

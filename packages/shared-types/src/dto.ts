@@ -93,6 +93,14 @@ export interface UpsertTripInput {
   origin?: string;
   carpoolRole?: CarpoolRole;
   carId?: string;
+  /**
+   * Passager·e d'une voiture qui n'est pas encore dans la liste (conducteur·ice
+   * pas inscrit·e) : on crée une voiture sans propriétaire avec ce nom (ou on
+   * reprend celle qui porte déjà ce nom) et on y prend une place.
+   */
+  newCarName?: string;
+  /** Places passager·es de cette nouvelle voiture (3 par défaut). */
+  newCarSeats?: number;
   lookingForCarpool?: boolean;
 }
 
@@ -117,7 +125,14 @@ export interface CreateShuttleInput {
   label: string;
   day: string;
   direction: Direction;
-  vehicle?: string;
+  /** Voiture de l'évènement utilisée pour la navette. */
+  vehicleCarId?: string;
+  /**
+   * Véhicule pas encore dans la liste : crée une voiture sans propriétaire
+   * (prêtable à tout le monde, places = capacité de la navette). Prioritaire
+   * sur `vehicleCarId`.
+   */
+  newVehicleName?: string;
   departureTime: string;
   stationArrivalTime: string;
   venueReturnTime?: string;
@@ -133,7 +148,10 @@ export type UpdateShuttleInput = Partial<
     "label" | "day" | "direction" | "departureTime" | "stationArrivalTime" | "capacity"
   >
 > &
-  Nullable<Pick<CreateShuttleInput, "vehicle" | "venueReturnTime" | "comment" | "driverPaxId">> & {
+  Nullable<
+    Pick<CreateShuttleInput, "vehicleCarId" | "venueReturnTime" | "comment" | "driverPaxId">
+  > &
+  Pick<CreateShuttleInput, "newVehicleName"> & {
     /**
      * Confirme une modif qui rend des passager·es incompatibles (autre sens,
      * autre jour, plus assez de places) : iels sont retiré·es de la navette.

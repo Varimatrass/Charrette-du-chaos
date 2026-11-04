@@ -39,7 +39,7 @@ export function factories(prisma: PrismaService) {
     station: (eventId: string, overrides: Partial<Station> = {}) =>
       prisma.station.create({ data: { eventId, name: "Gare de Testville", ...overrides } }),
 
-    car: (eventId: string, ownerPaxId: string, overrides: Partial<Car> = {}) =>
+    car: (eventId: string, ownerPaxId: string | null, overrides: Partial<Car> = {}) =>
       prisma.car.create({
         data: { eventId, ownerPaxId, name: "Twingo verte", seats: 2, ...overrides },
       }),

@@ -1,5 +1,15 @@
 import { IsDay, IsTime } from "../../common/validation/date-time.js";
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  IsInt,
+  Max,
+  Min,
+} from "class-validator";
 import { CarpoolRole, TransportMode } from "@desordre/shared-types";
 import type { UpsertTripInput } from "@desordre/shared-types";
 
@@ -55,6 +65,18 @@ export class UpsertTripDto implements UpsertTripInput {
   @IsOptional()
   @IsUUID()
   carId?: string;
+
+  /** Voiture pas encore dans la liste : créée sans propriétaire (prioritaire sur carId). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  newCarName?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  newCarSeats?: number;
 
   @IsOptional()
   @IsBoolean()

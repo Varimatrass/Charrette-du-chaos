@@ -279,6 +279,67 @@ describe("Trips (e2e)", () => {
         .expect(200);
     });
 
+    it("a passenger can name a car not in the list yet: it is created ownerless, then claimed by its driver (Q6)", async () => {
+      const put = (pax: string, body: object) =>
+        t.http().put("/pax/me/trips/OUTBOUND").set(t.asPax(pax)).send(body);
+      const first = await put(token, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        newCarName: "Le van de Lou",
+        newCarSeats: 2,
+      }).expect(200);
+      const car = await t.prisma.car.findUniqueOrThrow({ where: { id: first.body.carId } });
+      expect(car).toMatchObject({ ownerPaxId: null, name: "Le van de Lou", seats: 2 });
+
+      // Un·e autre passager·e qui tape le même nom monte dans la même voiture.
+      const other = await make.pax(eventId, { name: "Camille" });
+      const second = await put(other.accessToken, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        newCarName: "le van de lou",
+      }).expect(200);
+      expect(second.body.carId).toBe(car.id);
+
+      const cars = await t.http().get("/pax/me/cars").set(t.asPax(token)).expect(200);
+      expect(cars.body[0]).toMatchObject({ name: "Le van de Lou", owner: null });
+
+      // Lou s'inscrit et revendique sa voiture.
+      const lou = await make.pax(eventId, { name: "Lou" });
+      await t.http().post(`/pax/me/cars/${car.id}/claim`).set(t.asPax(lou.accessToken)).expect(201);
+      expect(await t.prisma.car.findUniqueOrThrow({ where: { id: car.id } })).toMatchObject({
+        ownerPaxId: lou.id,
+      });
+      expect((await t.prisma.pax.findUniqueOrThrow({ where: { id: lou.id } })).hasVehicle).toBe(
+        true,
+      );
+      // Déjà revendiquée : refusé pour les autres.
+      await t
+        .http()
+        .post(`/pax/me/cars/${car.id}/claim`)
+        .set(t.asPax(other.accessToken))
+        .expect(400);
+    });
+
+    it("a passenger who claims the car they ride in becomes its driver", async () => {
+      const car = await make.car(eventId, null, { name: "Kangoo" });
+      await make.trip(eventId, paxId, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: car.id,
+        status: "NO_SHUTTLE",
+      });
+      await t.http().post(`/pax/me/cars/${car.id}/claim`).set(t.asPax(token)).expect(201);
+      expect(
+        await t.prisma.trip.findUniqueOrThrow({
+          where: { paxId_direction: { paxId, direction: "OUTBOUND" } },
+        }),
+      ).toMatchObject({ carpoolRole: "DRIVER", carId: car.id });
+
+      // Une seule voiture par pax.
+      const another = await make.car(eventId, null, { name: "Autre" });
+      await t.http().post(`/pax/me/cars/${another.id}/claim`).set(t.asPax(token)).expect(400);
+    });
+
     it("deleting one's car sends its passengers back to 'looking for a carpool'", async () => {
       await t
         .http()

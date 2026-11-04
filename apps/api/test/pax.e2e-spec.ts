@@ -198,7 +198,7 @@ describe("Pax (e2e)", () => {
   });
 
   describe("DELETE /admin/pax/:id (B8)", () => {
-    it("lets the admin delete a pax (e.g. a duplicate) with their trips; the shuttle they drove loses its driver", async () => {
+    it("lets the admin delete a pax (e.g. a duplicate) with their trips; their shuttle loses its driver, their car stays ownerless", async () => {
       const event = await make.event({ name: "Suppression" });
       const pax = await make.pax(event.id, { name: "Doublon" });
       await make.trip(event.id, pax.id);
@@ -220,8 +220,13 @@ describe("Pax (e2e)", () => {
       expect(
         (await t.prisma.shuttle.findUniqueOrThrow({ where: { id: shuttle.id } })).driverPaxId,
       ).toBeNull();
+      // La voiture reste, sans propriétaire : ses passager·es gardent leur place.
+      expect(await t.prisma.car.findUniqueOrThrow({ where: { id: car.id } })).toMatchObject({
+        ownerPaxId: null,
+      });
       expect(await t.prisma.trip.findUniqueOrThrow({ where: { id: ride.id } })).toMatchObject({
-        lookingForCarpool: true,
+        carId: car.id,
+        lookingForCarpool: false,
       });
       await t.http().delete(`/admin/pax/${pax.id}`).set(t.asAdmin).expect(404);
     });

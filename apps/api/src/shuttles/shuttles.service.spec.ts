@@ -11,6 +11,7 @@ import {
   SHUTTLE_ID,
 } from "../testing/fixtures.js";
 import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
+import { CarsService } from "../cars/cars.service.js";
 import { findIncompatiblePassengers, remainingSeats, ShuttlesService } from "./shuttles.service.js";
 
 describe("remainingSeats", () => {
@@ -22,7 +23,10 @@ describe("remainingSeats", () => {
 
 describe("ShuttlesService", () => {
   const prisma = createPrismaMock();
-  const service = new ShuttlesService(asPrismaService(prisma));
+  const service = new ShuttlesService(
+    asPrismaService(prisma),
+    new CarsService(asPrismaService(prisma)),
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,10 +129,14 @@ describe("ShuttlesService", () => {
     });
 
     it("only touches provided fields and clears the ones sent as null", async () => {
-      await service.update(SHUTTLE_ID, { label: "Nouveau", vehicle: null, day: "2026-09-19" });
+      await service.update(SHUTTLE_ID, {
+        label: "Nouveau",
+        vehicleCarId: null,
+        day: "2026-09-19",
+      });
       expect(prisma.shuttle.update).toHaveBeenCalledWith({
         where: { id: SHUTTLE_ID },
-        data: { label: "Nouveau", vehicle: null, day: new Date("2026-09-19") },
+        data: { label: "Nouveau", vehicleCarId: null, day: new Date("2026-09-19") },
       });
     });
 

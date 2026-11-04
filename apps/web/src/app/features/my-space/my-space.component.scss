@@ -18,19 +18,6 @@
   }
 }
 
-.notice {
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-}
-
-.notice-ok {
-  background: #e8f5e9;
-}
-
-.notice-warn {
-  background: #fff3e0;
-}
-
 .question {
   margin: 0.5rem 0 0;
   font-weight: 500;
@@ -62,5 +49,20 @@ mat-radio-group {
     align-items: center;
     gap: 0.5rem;
     padding: 0.25rem 0;
+  }
+}
+
+.ownerless-cars {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
 }
