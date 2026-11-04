@@ -101,8 +101,10 @@
                   class="wait-badge"
                   [class.badge-warn]="trip.waitLevel === WaitLevel.MEDIUM"
                   [class.badge-warn-strong]="trip.waitLevel === WaitLevel.HIGH"
+                  [class.badge-danger]="trip.waitLevel === WaitLevel.MISSED"
                 >
-                  attente {{ trip.waitLevel | waitLevelLabel }}
+                  {{ trip.waitLevel === WaitLevel.MISSED ? "" : "attente "
+                  }}{{ trip.waitLevel | waitLevelLabel }}
                 </span>
               }
             </li>

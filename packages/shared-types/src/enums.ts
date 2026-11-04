@@ -51,6 +51,12 @@ export const WaitLevel = {
   OK: "OK", // < 30 min
   MEDIUM: "MEDIUM", // >= 30 min (jaune dans le Sheet d'origine)
   HIGH: "HIGH", // >= 1h (orange dans le Sheet d'origine)
+  /**
+   * Écart négatif : à l'aller le train arrive après le passage de la navette,
+   * au retour la navette arrive en gare après le départ du train. Le pax rate
+   * sa navette (ou son train) : c'est la pire situation, affichée en rouge.
+   */
+  MISSED: "MISSED",
 } as const;
 export type WaitLevel = (typeof WaitLevel)[keyof typeof WaitLevel];
 

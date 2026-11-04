@@ -48,6 +48,7 @@
           <mat-chip
             [class.badge-warn]="t.waitLevel === WaitLevel.MEDIUM"
             [class.badge-warn-strong]="t.waitLevel === WaitLevel.HIGH"
+            [class.badge-danger]="t.waitLevel === WaitLevel.MISSED"
           >
             {{ t.waitLevel | waitLevelLabel }}
           </mat-chip>

@@ -115,3 +115,15 @@ body {
 .badge-warn-strong {
   background: #ffe0b2;
 }
+
+// Rouge : situation à corriger (navette ratée, navette surbookée…).
+.badge-danger {
+  background: #ffcdd2;
+  color: #b71c1c;
+  font-weight: 500;
+}
+
+.text-danger {
+  color: #c62828;
+  font-weight: 500;
+}
