@@ -7,7 +7,7 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { HttpErrorResponse } from "@angular/common/http";
 import { forkJoin, of } from "rxjs";
-import { catchError } from "rxjs/operators";
+import { catchError, map } from "rxjs/operators";
 import { Direction, TransportMode, TripStatus, WaitLevel } from "@desordre/shared-types";
 import type {
   ShuttleWithRemainingSeats,
@@ -18,10 +18,11 @@ import type {
 } from "@desordre/shared-types";
 import { TRANSPORT_MODE_LABELS } from "../../core/labels";
 import { AdminApiService } from "../../core/api/admin-api.service";
+import { EventsApiService } from "../../core/api/events-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
 import { EntityOption, EntitySelectComponent } from "../entity-select/entity-select.component";
-import { DIRECTIONS, summarizeTrip, TableContext } from "./table-role";
+import { contextEventId, DIRECTIONS, summarizeTrip, TableContext } from "./table-role";
 
 /** Une ligne, quel que soit le rôle. Les coordonnées/commentaires n'existent que côté orga. */
 interface TripRow {
@@ -71,6 +72,7 @@ export class TripsTableComponent {
 
   private readonly adminApi = inject(AdminApiService);
   private readonly paxApi = inject(PaxApiService);
+  private readonly eventsApi = inject(EventsApiService);
   private readonly snackBar = inject(MatSnackBar);
 
   readonly TripStatus = TripStatus;
@@ -142,8 +144,9 @@ export class TripsTableComponent {
         trips: this.adminApi.listTrips(context.eventId),
         shuttles: this.adminApi.listShuttles(context.eventId),
         cars: this.adminApi.listCars(context.eventId).pipe(catchError(() => of([]))),
+        preferredStationId: this.preferredStationId(context),
       }).subscribe({
-        next: ({ trips, shuttles, cars }) => {
+        next: ({ trips, shuttles, cars, preferredStationId }) => {
           const shuttlesById = new Map(shuttles.map((s) => [s.id, s]));
           const carsById = new Map(cars.map((c) => [c.id, c]));
           this.shuttles.set(shuttles);
@@ -155,7 +158,7 @@ export class TripsTableComponent {
               isMine: false,
               direction: trip.direction,
               mode: trip.mode,
-              summary: summarizeTrip(trip, shuttlesById, carsById),
+              summary: summarizeTrip(trip, shuttlesById, carsById, preferredStationId),
               day: trip.day,
               time: trip.time,
               stationName: trip.station?.name ?? null,
@@ -183,8 +186,9 @@ export class TripsTableComponent {
       trips: this.paxApi.listMyEventTrips(token),
       shuttles: this.paxApi.listMyEventShuttles(token),
       cars: this.paxApi.listMyEventCars(token).pipe(catchError(() => of([]))),
+      preferredStationId: this.preferredStationId(context),
     }).subscribe({
-      next: ({ trips, shuttles, cars }) => {
+      next: ({ trips, shuttles, cars, preferredStationId }) => {
         const shuttlesById = new Map(shuttles.map((s) => [s.id, s]));
         const carsById = new Map(cars.map((c) => [c.id, c]));
         this.shuttles.set(shuttles);
@@ -196,7 +200,7 @@ export class TripsTableComponent {
             isMine: trip.paxId === context.myPaxId,
             direction: trip.direction,
             mode: trip.mode,
-            summary: summarizeTrip(trip, shuttlesById, carsById),
+            summary: summarizeTrip(trip, shuttlesById, carsById, preferredStationId),
             day: trip.day,
             time: trip.time,
             stationName: trip.stationName,
@@ -210,6 +214,17 @@ export class TripsTableComponent {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** La gare desservie par les navettes (pour le résumé des trajets en train). */
+  private preferredStationId(context: TableContext) {
+    const eventId = contextEventId(context);
+    return eventId
+      ? this.eventsApi.get(eventId).pipe(
+          map((event) => event.preferredStationId),
+          catchError(() => of(null)),
+        )
+      : of(null);
   }
 
   setDirection(direction: Direction): void {

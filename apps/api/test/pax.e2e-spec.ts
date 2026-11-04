@@ -111,7 +111,7 @@ describe("Pax (e2e)", () => {
         .expect(400);
     });
 
-    it("GET /pax/me/paxs lists the other paxs with a trip summary and no contact details", async () => {
+    it("GET /pax/me/paxs lists the other paxs with their Discord and a trip summary, no email/phone (Q1)", async () => {
       const me = await make.pax(eventId, { name: "Moi" });
       const bilal = await make.pax(eventId, {
         name: "Bilal",
@@ -136,10 +136,12 @@ describe("Pax (e2e)", () => {
       expect(bilalOverview).toEqual({
         id: bilal.id,
         name: "Bilal",
+        discordHandle: "bilal#1",
         trips: [
           {
             direction: "OUTBOUND",
             mode: "CARPOOL",
+            stationId: null,
             status: "PENDING",
             shuttleId: null,
             carpoolRole: "PASSENGER",
@@ -148,7 +150,7 @@ describe("Pax (e2e)", () => {
           },
         ],
       });
-      expect(JSON.stringify(body)).not.toMatch(/b@example.com|0601|bilal#|secret|interne/);
+      expect(JSON.stringify(body)).not.toMatch(/b@example.com|0601|secret|interne/);
     });
   });
 

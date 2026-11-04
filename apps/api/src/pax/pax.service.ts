@@ -12,18 +12,21 @@ import { UpdatePaxDto } from "./dto/update-pax.dto.js";
 export type PublicPax = Omit<Pax, "accessToken">;
 
 /**
- * Champs exposés aux autres paxs de l'évènement : le nom et comment iel
- * vient (résumé de ses trajets) — jamais de coordonnées, de commentaire ni
- * de jeton. Sélection explicite pour qu'un futur champ sensible ne fuite
- * pas ici par défaut.
+ * Champs exposés aux autres paxs de l'évènement : le nom, le pseudo Discord
+ * (tout le monde est invité sur le serveur Discord de l'évènement) et comment
+ * iel vient (résumé de ses trajets) — jamais d'email, de téléphone, de
+ * commentaire ni de jeton. Sélection explicite pour qu'un futur champ
+ * sensible ne fuite pas ici par défaut.
  */
 const PAX_OVERVIEW_SELECT = {
   id: true,
   name: true,
+  discordHandle: true,
   trips: {
     select: {
       direction: true,
       mode: true,
+      stationId: true,
       status: true,
       shuttleId: true,
       carpoolRole: true,

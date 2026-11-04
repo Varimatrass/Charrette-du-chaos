@@ -97,13 +97,13 @@ describe("PaxService", () => {
   });
 
   describe("findAllForEventOverview", () => {
-    it("selects only the name and a trip summary (no email, phone, comment or token)", async () => {
+    it("selects only the name, Discord and a trip summary (no email, phone, comment or token)", async () => {
       prisma.pax.findMany.mockResolvedValue([]);
       await service.findAllForEventOverview(EVENT_ID);
       const call = prisma.pax.findMany.mock.calls[0]?.[0] as {
         select: { trips: { select: Record<string, boolean> } } & Record<string, unknown>;
       };
-      expect(Object.keys(call.select).sort()).toEqual(["id", "name", "trips"]);
+      expect(Object.keys(call.select).sort()).toEqual(["discordHandle", "id", "name", "trips"]);
       expect(Object.keys(call.select.trips.select).sort()).toEqual(
         [
           "carId",
@@ -112,6 +112,7 @@ describe("PaxService", () => {
           "lookingForCarpool",
           "mode",
           "shuttleId",
+          "stationId",
           "status",
         ].sort(),
       );

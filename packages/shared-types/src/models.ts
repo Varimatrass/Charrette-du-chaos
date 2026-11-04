@@ -281,6 +281,7 @@ export interface DriverAvailabilitySlotWithPax extends DriverAvailabilitySlot {
 export interface PaxOverviewTrip {
   direction: Direction;
   mode: TransportMode | null;
+  stationId: string | null;
   status: TripStatus;
   shuttleId: string | null;
   carpoolRole: CarpoolRole | null;
@@ -290,12 +291,14 @@ export interface PaxOverviewTrip {
 
 /**
  * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais
- * ses coordonnées de contact (email/téléphone) ni son jeton d'accès —
- * seulement son nom, comment iel vient et ce qu'iel cherche.
+ * son email, son téléphone ni son jeton d'accès — seulement son nom, son
+ * pseudo Discord (tout le monde est sur le même serveur Discord de
+ * l'évènement), comment iel vient et ce qu'iel cherche.
  */
 export interface PaxOverview {
   id: string;
   name: string;
+  discordHandle: string | null;
   trips: PaxOverviewTrip[];
 }
 
