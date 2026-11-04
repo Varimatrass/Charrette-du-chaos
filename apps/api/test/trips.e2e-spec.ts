@@ -364,6 +364,10 @@ describe("Trips (e2e)", () => {
         lookingForCarpool: true,
         carpoolRole: "PASSENGER",
       });
+      // B11 : le pax n'a plus de véhicule.
+      expect((await t.prisma.pax.findUniqueOrThrow({ where: { id: paxId } })).hasVehicle).toBe(
+        false,
+      );
     });
   });
 

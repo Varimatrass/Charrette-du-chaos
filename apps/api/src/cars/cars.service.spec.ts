@@ -81,6 +81,11 @@ describe("CarsService", () => {
         data: { lookingForCarpool: true },
       });
       expect(prisma.car.delete).toHaveBeenCalledWith({ where: { id: CAR_ID } });
+      // B11 : plus de voiture, plus de véhicule.
+      expect(prisma.pax.update).toHaveBeenCalledWith({
+        where: { id: pax.id },
+        data: { hasVehicle: false },
+      });
     });
 
     it("throws a 404 when the pax has no car", async () => {

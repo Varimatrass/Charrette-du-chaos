@@ -69,7 +69,8 @@ export class CarsService {
 
   /**
    * Supprime la voiture du pax. Les trajets des passager·es qui y étaient
-   * repassent à "cherche un covoit" (la FK est en SET NULL, on remet le flag).
+   * repassent à "cherche un covoit" (la FK est en SET NULL, on remet le flag),
+   * et le pax n'a plus de véhicule.
    */
   async deleteMine(pax: Pax): Promise<void> {
     const car = await this.prisma.car.findUnique({ where: { ownerPaxId: pax.id } });
@@ -84,6 +85,8 @@ export class CarsService {
         data: { carpoolRole: null },
       }),
       this.prisma.car.delete({ where: { id: car.id } }),
+      // Plus de voiture déclarée : "a un véhicule" repasse à non (B11).
+      this.prisma.pax.update({ where: { id: pax.id }, data: { hasVehicle: false } }),
     ]);
   }
 

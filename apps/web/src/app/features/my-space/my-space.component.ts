@@ -19,9 +19,8 @@ import { MatInputModule } from "@angular/material/input";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
 import { MatRadioModule } from "@angular/material/radio";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
-import { HttpErrorResponse } from "@angular/common/http";
 import { forkJoin, of } from "rxjs";
-import { catchError } from "rxjs/operators";
+import { catchError, switchMap } from "rxjs/operators";
 import { Direction, TripStatus } from "@desordre/shared-types";
 import type {
   Car,
@@ -41,6 +40,10 @@ import { emptyToNull, emptyToUndefined, toDateInputValue } from "../../core/util
 import { CarFormComponent } from "../../shared/car-form/car-form.component";
 import { TripFormComponent } from "../../shared/trip-form/trip-form.component";
 
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
+import { apiErrorMessage } from "../../core/utils/http-errors";
+import type { UpsertCarInput } from "@desordre/shared-types";
+import { CarDialogComponent, CarDialogData } from "../../shared/car-form/car-dialog.component";
 const SNACKBAR_SHORT_MS = 2000;
 const SNACKBAR_LONG_MS = 3000;
 
@@ -67,6 +70,7 @@ const SNACKBAR_LONG_MS = 3000;
     MatProgressSpinnerModule,
     TripFormComponent,
     CarFormComponent,
+    MatDialogModule,
     ...LABEL_PIPES,
   ],
   templateUrl: "./my-space.component.html",
@@ -77,6 +81,7 @@ export class MySpaceComponent {
   private readonly paxApi = inject(PaxApiService);
   private readonly eventsApi = inject(EventsApiService);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly dialog = inject(MatDialog);
 
   readonly TripStatus = TripStatus;
   readonly directions = DIRECTIONS;
@@ -214,9 +219,7 @@ export class MySpaceComponent {
   }
 
   private errorMessage(error: unknown, fallback: string): string {
-    return error instanceof HttpErrorResponse && typeof error.error?.message === "string"
-      ? error.error.message
-      : fallback;
+    return apiErrorMessage(error, fallback);
   }
 
   assignedShuttle(direction: Direction): Shuttle | null {
@@ -311,9 +314,50 @@ export class MySpaceComponent {
     });
   }
 
+  /**
+   * Enregistre un trajet. Pour un trajet "avec ma voiture" alors que la
+   * voiture n'est pas encore déclarée, on l'enregistre d'abord (B10) : avec
+   * le bloc "Ma voiture" s'il est complet, sinon en demandant ce qui manque
+   * dans une boîte de dialogue.
+   */
   saveTrip(direction: Direction): void {
     const form = this.tripForms().find((f) => f.direction() === direction);
     if (!form) return;
+    if (!form.isDriver() || this.myCar()) {
+      this.saveTripOnly(direction, form);
+      return;
+    }
+
+    const carForm = this.carForm();
+    if (carForm?.form.valid) {
+      this.saveCarThenTrip(carForm.toInput(), direction, form);
+      return;
+    }
+    this.dialog
+      .open<CarDialogComponent, CarDialogData, UpsertCarInput>(CarDialogComponent, {
+        data: { draft: carForm?.form.getRawValue() ?? {} },
+      })
+      .afterClosed()
+      .subscribe((car) => {
+        if (car) this.saveCarThenTrip(car, direction, form);
+      });
+  }
+
+  private saveCarThenTrip(car: UpsertCarInput, direction: Direction, form: TripFormComponent) {
+    this.savingTrip.set(direction);
+    this.paxApi
+      .upsertMyCar(this.token, car)
+      .pipe(switchMap(() => this.paxApi.updateMyInfo(this.token, { hasVehicle: true })))
+      .subscribe({
+        next: () => this.saveTripOnly(direction, form),
+        error: (error: unknown) => {
+          this.savingTrip.set(null);
+          this.notify(this.errorMessage(error, "Impossible d'enregistrer ta voiture."), 5000);
+        },
+      });
+  }
+
+  private saveTripOnly(direction: Direction, form: TripFormComponent): void {
     this.savingTrip.set(direction);
     this.paxApi.upsertMyTrip(this.token, direction, form.toInput()).subscribe({
       next: () => {
