@@ -90,6 +90,38 @@ describe("Shuttles (e2e)", () => {
         .expect(400);
     });
 
+    it("validates times (HH:mm) and keeps the day within the event (B9)", async () => {
+      for (const departureTime of ["8h", "25:00", "8:00", "12:60"]) {
+        await t
+          .http()
+          .post("/admin/shuttles")
+          .set(t.asAdmin)
+          .send({ ...validShuttle(), departureTime })
+          .expect(400);
+      }
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), day: "18/09/2026" })
+        .expect(400);
+      const { body } = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), day: "2026-09-25" })
+        .expect(400);
+      expect(body.message).toMatch(/pendant l'évènement/);
+
+      const shuttle = await make.shuttle(eventId);
+      await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ day: "2026-09-10" })
+        .expect(400);
+    });
+
     it("lists shuttles with remaining seats, ordered by day then departure time", async () => {
       const late = await make.shuttle(eventId, {
         label: "Tard",
@@ -150,17 +182,21 @@ describe("Shuttles (e2e)", () => {
 
     it("updates provided fields, clears optional ones with null, and refuses to null a required one", async () => {
       const driver = await make.pax(eventId);
-      const shuttle = await make.shuttle(eventId, { vehicle: "Kangoo", driverPaxId: driver.id });
+      const kangoo = await make.car(eventId, null, { name: "Kangoo" });
+      const shuttle = await make.shuttle(eventId, {
+        vehicleCarId: kangoo.id,
+        driverPaxId: driver.id,
+      });
 
       const { body } = await t
         .http()
         .patch(`/admin/shuttles/${shuttle.id}`)
         .set(t.asAdmin)
-        .send({ label: "Renommée", vehicle: null, driverPaxId: null })
+        .send({ label: "Renommée", vehicleCarId: null, driverPaxId: null })
         .expect(200);
       expect(body).toMatchObject({
         label: "Renommée",
-        vehicle: null,
+        vehicleCarId: null,
         driverPaxId: null,
         capacity: 4,
       });
@@ -183,6 +219,138 @@ describe("Shuttles (e2e)", () => {
         .set(t.asAdmin)
         .send({ eventId })
         .expect(400);
+    });
+  });
+
+  describe("PATCH /admin/shuttles/:id with passengers (B5)", () => {
+    it("answers 409 with the incompatible passengers, then removes them once confirmed", async () => {
+      const shuttle = await make.shuttle(eventId, { capacity: 3 });
+      const names = ["Alix", "Bilal", "Kim"];
+      const trips = [];
+      for (const [index, name] of names.entries()) {
+        const pax = await make.pax(eventId, { name });
+        trips.push(
+          await make.trip(eventId, pax.id, {
+            shuttleId: shuttle.id,
+            status: "ASSIGNED",
+            shuttleAssignedAt: new Date(Date.UTC(2026, 8, 1 + index)),
+          }),
+        );
+      }
+
+      const conflict = await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ capacity: 1, label: "Plus petite" })
+        .expect(409);
+      expect(conflict.body.incompatible).toEqual([
+        { tripId: trips[2]!.id, paxName: "Kim", reason: "CAPACITY" },
+        { tripId: trips[1]!.id, paxName: "Bilal", reason: "CAPACITY" },
+      ]);
+      // Rien n'a été enregistré.
+      expect(
+        (await t.prisma.shuttle.findUniqueOrThrow({ where: { id: shuttle.id } })).label,
+      ).not.toBe("Plus petite");
+
+      await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ capacity: 1, label: "Plus petite", removeIncompatible: true })
+        .expect(200);
+      const remaining = await t.prisma.trip.findMany({ where: { shuttleId: shuttle.id } });
+      expect(remaining.map((trip) => trip.id)).toEqual([trips[0]!.id]);
+      const removed = await t.prisma.trip.findUniqueOrThrow({ where: { id: trips[2]!.id } });
+      expect(removed).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("changing the direction makes every passenger incompatible", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const pax = await make.pax(eventId);
+      await make.trip(eventId, pax.id, { shuttleId: shuttle.id, status: "ASSIGNED" });
+      const { body } = await t
+        .http()
+        .patch(`/admin/shuttles/${shuttle.id}`)
+        .set(t.asAdmin)
+        .send({ direction: "RETURN" })
+        .expect(409);
+      expect(body.incompatible).toHaveLength(1);
+      expect(body.incompatible[0].reason).toBe("DIRECTION");
+    });
+  });
+
+  describe("shuttle vehicle = a car of the event (Q6)", () => {
+    it("links an existing car, or creates an ownerless one from a new name (reused if typed again)", async () => {
+      const owner = await make.pax(eventId, { name: "Fanta" });
+      const clio = await make.car(eventId, owner.id, {
+        name: "Clio",
+        lendingMode: "ONLY_IF_OWNER_DRIVES",
+      });
+      const linked = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), vehicleCarId: clio.id })
+        .expect(201);
+      expect(linked.body.vehicleCarId).toBe(clio.id);
+
+      const created = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), capacity: 7, newVehicleName: "  Camion  de la ferme " })
+        .expect(201);
+      const truck = await t.prisma.car.findUniqueOrThrow({
+        where: { id: created.body.vehicleCarId },
+      });
+      expect(truck).toMatchObject({
+        name: "Camion de la ferme",
+        ownerPaxId: null,
+        seats: 7,
+        lendingMode: "AVAILABLE_ANY_DRIVER",
+      });
+      const again = await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), newVehicleName: "camion de la ferme" })
+        .expect(201);
+      expect(again.body.vehicleCarId).toBe(truck.id);
+
+      const list = await t.http().get(`/admin/shuttles?eventId=${eventId}`).set(t.asAdmin);
+      const withClio = list.body.find((s: { id: string }) => s.id === linked.body.id);
+      expect(withClio.vehicleCar).toMatchObject({
+        name: "Clio",
+        ownerName: "Fanta",
+        lendingMode: "ONLY_IF_OWNER_DRIVES",
+      });
+
+      const otherEvent = await make.event({ name: "Autre" });
+      const foreign = await make.car(otherEvent.id, null);
+      await t
+        .http()
+        .post("/admin/shuttles")
+        .set(t.asAdmin)
+        .send({ ...validShuttle(), vehicleCarId: foreign.id })
+        .expect(400);
+    });
+  });
+
+  describe("DELETE /admin/shuttles/:id (B8)", () => {
+    it("deletes the shuttle and puts its passengers back to PENDING", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const pax = await make.pax(eventId);
+      const trip = await make.trip(eventId, pax.id, { shuttleId: shuttle.id, status: "ASSIGNED" });
+
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).expect(401);
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).set(t.asAdmin).expect(204);
+      expect(await t.prisma.shuttle.count()).toBe(0);
+      expect(await t.prisma.trip.findUniqueOrThrow({ where: { id: trip.id } })).toMatchObject({
+        shuttleId: null,
+        status: "PENDING",
+      });
+      await t.http().delete(`/admin/shuttles/${shuttle.id}`).set(t.asAdmin).expect(404);
     });
   });
 

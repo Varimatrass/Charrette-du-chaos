@@ -34,8 +34,12 @@ describe("computeWaitLevel", () => {
       expect(computeWaitLevel(Direction.OUTBOUND, train, shuttle)).toBe(expected);
     });
 
-    it("never goes negative when the shuttle passes before the train arrives", () => {
-      expect(computeWaitLevel(Direction.OUTBOUND, "09:00", "08:25")).toBe(WaitLevel.OK);
+    it("flags a missed shuttle when it passes before the train arrives", () => {
+      expect(computeWaitLevel(Direction.OUTBOUND, "09:00", "08:25")).toBe(WaitLevel.MISSED);
+    });
+
+    it("is OK when the train arrives exactly when the shuttle is there", () => {
+      expect(computeWaitLevel(Direction.OUTBOUND, "08:25", "08:25")).toBe(WaitLevel.OK);
     });
   });
 
@@ -48,8 +52,8 @@ describe("computeWaitLevel", () => {
       expect(computeWaitLevel(Direction.RETURN, train, shuttle)).toBe(expected);
     });
 
-    it("never goes negative when the shuttle arrives after the train left", () => {
-      expect(computeWaitLevel(Direction.RETURN, "09:00", "09:25")).toBe(WaitLevel.OK);
+    it("flags a missed train when the shuttle arrives after the train left", () => {
+      expect(computeWaitLevel(Direction.RETURN, "09:00", "09:25")).toBe(WaitLevel.MISSED);
     });
   });
 

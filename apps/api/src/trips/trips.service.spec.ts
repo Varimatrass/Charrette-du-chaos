@@ -4,6 +4,7 @@ import { CarsService } from "../cars/cars.service.js";
 import { ShuttlesService } from "../shuttles/shuttles.service.js";
 import { StationsService } from "../stations/stations.service.js";
 import {
+  makeEvent,
   CAR_ID,
   EVENT_ID,
   makeCar,
@@ -16,7 +17,7 @@ import {
   TRIP_ID,
 } from "../testing/fixtures.js";
 import { asPrismaService, createPrismaMock } from "../testing/prisma-mock.js";
-import { statusAfterPaxEdit, TripsService } from "./trips.service.js";
+import { diffTripFields, statusAfterPaxEdit, TripsService } from "./trips.service.js";
 
 describe("statusAfterPaxEdit", () => {
   it("flags an assigned trip for re-check when the pax edits it", () => {
@@ -38,18 +39,43 @@ const NO_MODE_FIELDS = {
   lookingForCarpool: false,
 };
 
+describe("diffTripFields", () => {
+  const base = {
+    mode: "TRAIN",
+    day: "2026-09-18",
+    time: "08:05",
+    station: "Gare de Testville",
+    comment: null,
+    shuttle: "Navette 1",
+  };
+
+  it("is empty when nothing relevant changes", () => {
+    expect(diffTripFields(base, { ...base })).toEqual([]);
+  });
+
+  it("lists each changed field with its before and after values", () => {
+    expect(diffTripFields(base, { ...base, time: "09:40", comment: "train en retard" })).toEqual([
+      { field: "time", before: "08:05", after: "09:40" },
+      { field: "comment", before: null, after: "train en retard" },
+    ]);
+  });
+});
+
 describe("TripsService", () => {
   const prisma = createPrismaMock();
   const stations = new StationsService(asPrismaService(prisma));
   const cars = new CarsService(asPrismaService(prisma));
-  const shuttles = new ShuttlesService(asPrismaService(prisma));
+  const shuttles = new ShuttlesService(asPrismaService(prisma), cars);
   const service = new TripsService(asPrismaService(prisma), stations, cars, shuttles);
   const pax = makePax();
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma.event.findUniqueOrThrow.mockResolvedValue(makeEvent());
+  });
 
   describe("upsertMine", () => {
-    it("creates a PENDING trip with explicit nulls for undecided fields", async () => {
+    it("creates a trip with explicit nulls for undecided fields (NO_SHUTTLE when not by train)", async () => {
       prisma.trip.findUnique.mockResolvedValue(null);
       prisma.trip.create.mockResolvedValue(makeTrip());
 
@@ -68,8 +94,19 @@ describe("TripsService", () => {
           direction: Direction.OUTBOUND,
           eventId: pax.eventId,
           paxId: pax.id,
-          status: TripStatus.PENDING,
+          status: TripStatus.NO_SHUTTLE,
         },
+      });
+    });
+
+    it("creates a train trip as PENDING (looking for a shuttle)", async () => {
+      prisma.trip.findUnique.mockResolvedValue(null);
+      prisma.trip.create.mockResolvedValue(makeTrip());
+
+      await service.upsertMine(pax, Direction.OUTBOUND, { mode: "TRAIN" });
+
+      expect(prisma.trip.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ mode: "TRAIN", status: TripStatus.PENDING }),
       });
     });
 
@@ -78,11 +115,18 @@ describe("TripsService", () => {
       prisma.trip.findUnique.mockResolvedValue(existing);
       prisma.trip.update.mockResolvedValue(existing);
       prisma.station.findUnique.mockResolvedValue(makeStation());
+      prisma.station.findMany.mockResolvedValue([makeStation()]);
+      prisma.shuttle.findUnique.mockResolvedValue(makeShuttle());
 
       await service.upsertMine(pax, Direction.OUTBOUND, {
         mode: "TRAIN",
         day: "2026-09-18",
         stationId: STATION_ID,
+      });
+
+      // P2 : ce qui a changé est gardé pour l'orga (ici l'heure a été vidée).
+      expect(prisma.tripChange.create).toHaveBeenCalledWith({
+        data: { tripId: existing.id, changes: [{ field: "time", before: "08:05", after: null }] },
       });
 
       expect(prisma.trip.create).not.toHaveBeenCalled();
@@ -95,9 +139,48 @@ describe("TripsService", () => {
           comment: null,
           ...NO_MODE_FIELDS,
           stationId: STATION_ID,
+          shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: null,
           status: TripStatus.TO_RECHECK,
         },
       });
+    });
+
+    it("keeps an assigned trip ASSIGNED and records nothing when nothing relevant changed", async () => {
+      const existing = makeTrip({ status: TripStatus.ASSIGNED, shuttleId: SHUTTLE_ID });
+      prisma.trip.findUnique.mockResolvedValue(existing);
+      prisma.trip.update.mockResolvedValue(existing);
+      prisma.station.findUnique.mockResolvedValue(makeStation());
+      prisma.station.findMany.mockResolvedValue([makeStation()]);
+      prisma.shuttle.findUnique.mockResolvedValue(makeShuttle());
+
+      await service.upsertMine(pax, Direction.OUTBOUND, {
+        mode: "TRAIN",
+        day: "2026-09-18",
+        time: "08:05",
+        stationId: STATION_ID,
+      });
+
+      expect(prisma.tripChange.create).not.toHaveBeenCalled();
+      expect(prisma.trip.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: TripStatus.ASSIGNED }) }),
+      );
+    });
+
+    it("leaving the train takes the trip out of its shuttle (B2)", async () => {
+      const existing = makeTrip({ status: TripStatus.ASSIGNED, shuttleId: SHUTTLE_ID });
+      prisma.trip.findUnique.mockResolvedValue(existing);
+      prisma.trip.update.mockResolvedValue(existing);
+      prisma.station.findMany.mockResolvedValue([makeStation()]);
+      prisma.shuttle.findUnique.mockResolvedValue(makeShuttle());
+
+      await service.upsertMine(pax, Direction.OUTBOUND, { mode: "OTHER" });
+
+      expect(prisma.trip.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ shuttleId: null, status: TripStatus.NO_SHUTTLE }),
+        }),
+      );
     });
 
     it("lets a pax go back to 'undecided' by sending an empty body", async () => {
@@ -111,7 +194,8 @@ describe("TripsService", () => {
           data: expect.objectContaining({
             mode: null,
             stationId: null,
-            status: TripStatus.PENDING,
+            shuttleId: null,
+            status: TripStatus.NO_SHUTTLE,
           }),
         }),
       );
@@ -257,7 +341,11 @@ describe("TripsService", () => {
       expect(prisma.$queryRaw).toHaveBeenCalledBefore(prisma.shuttle.findUnique);
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: SHUTTLE_ID, status: TripStatus.ASSIGNED },
+        data: {
+          shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: expect.any(Date),
+          status: TripStatus.ASSIGNED,
+        },
       });
     });
 
@@ -295,7 +383,7 @@ describe("TripsService", () => {
       await service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: null });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: null, status: TripStatus.PENDING },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: TripStatus.PENDING },
       });
     });
 
@@ -304,6 +392,31 @@ describe("TripsService", () => {
       await expect(
         service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: SHUTTLE_ID }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("is reserved to trips by train (B3)", async () => {
+      prisma.trip.findUnique.mockResolvedValue(makeTrip({ mode: "CARPOOL" }));
+      await expect(
+        service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: SHUTTLE_ID }),
+      ).rejects.toThrow(/train/);
+      expect(prisma.trip.update).not.toHaveBeenCalled();
+    });
+
+    it("refuses a shuttle running on another day than the trip, explaining why (B7)", async () => {
+      prisma.trip.findUnique.mockResolvedValue(makeTrip({ day: new Date("2026-09-19") }));
+      prisma.shuttle.findUnique.mockResolvedValue(shuttleWithSeats(0));
+      await expect(
+        service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: SHUTTLE_ID }),
+      ).rejects.toThrow(/vendredi 18 septembre.*samedi 19 septembre/);
+    });
+
+    it("accepts any shuttle day when the trip day is not known yet", async () => {
+      prisma.trip.findUnique.mockResolvedValue(makeTrip({ day: null }));
+      prisma.shuttle.findUnique.mockResolvedValue(shuttleWithSeats(0));
+      prisma.trip.update.mockResolvedValue(makeTrip());
+      await expect(
+        service.setMyShuttle(pax, Direction.OUTBOUND, { shuttleId: SHUTTLE_ID }),
+      ).resolves.toBeDefined();
     });
   });
 
@@ -389,7 +502,11 @@ describe("TripsService", () => {
       await service.assign(TRIP_ID, { shuttleId: SHUTTLE_ID });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: SHUTTLE_ID, status: TripStatus.ASSIGNED },
+        data: {
+          shuttleId: SHUTTLE_ID,
+          shuttleAssignedAt: expect.any(Date),
+          status: TripStatus.ASSIGNED,
+        },
       });
     });
 
@@ -408,8 +525,23 @@ describe("TripsService", () => {
       await service.assign(TRIP_ID, { shuttleId: null });
       expect(prisma.trip.update).toHaveBeenCalledWith({
         where: { id: TRIP_ID },
-        data: { shuttleId: null, status: TripStatus.PENDING },
+        data: { shuttleId: null, shuttleAssignedAt: null, status: TripStatus.PENDING },
       });
+    });
+
+    it("refuses to put a trip that is not by train in a shuttle", async () => {
+      prisma.trip.findUnique.mockResolvedValue(makeTrip({ mode: "CARPOOL" }));
+      await expect(service.assign(TRIP_ID, { shuttleId: SHUTTLE_ID })).rejects.toThrow(/train/);
+    });
+
+    it("lets the admin overbook a full shuttle (B4: shown, not blocked)", async () => {
+      prisma.trip.findUnique.mockResolvedValue(makeTrip());
+      prisma.shuttle.findUnique.mockResolvedValue({
+        ...makeShuttle({ capacity: 1 }),
+        _count: { trips: 1 },
+      });
+      prisma.trip.update.mockResolvedValue(makeTrip());
+      await expect(service.assign(TRIP_ID, { shuttleId: SHUTTLE_ID })).resolves.toBeDefined();
     });
 
     it("throws a 404 for an unknown trip", async () => {

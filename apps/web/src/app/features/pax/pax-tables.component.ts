@@ -36,7 +36,13 @@ export class PaxTablesComponent {
 
   constructor() {
     this.paxApi.getMySpace(this.token).subscribe({
-      next: (pax) => this.context.set({ role: "pax", token: this.token, myPaxId: pax.id }),
+      next: (pax) =>
+        this.context.set({
+          role: "pax",
+          token: this.token,
+          myPaxId: pax.id,
+          myEventId: pax.eventId,
+        }),
       error: () => this.context.set({ role: "pax", token: this.token }),
     });
   }

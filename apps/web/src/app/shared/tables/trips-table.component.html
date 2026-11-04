@@ -9,7 +9,23 @@
     <mat-button-toggle [value]="TripStatus.PENDING">En attente</mat-button-toggle>
     <mat-button-toggle [value]="TripStatus.ASSIGNED">Assignés</mat-button-toggle>
     <mat-button-toggle [value]="TripStatus.TO_RECHECK">À revérifier</mat-button-toggle>
+    <mat-button-toggle [value]="TripStatus.NO_SHUTTLE">Sans navette</mat-button-toggle>
   </mat-button-toggle-group>
+  @if (isAdmin()) {
+    <mat-button-toggle-group
+      [value]="onlyChanged()"
+      (change)="onlyChanged.set($event.value)"
+      aria-label="Modifications à voir"
+    >
+      <mat-button-toggle [value]="false">Tout</mat-button-toggle>
+      <mat-button-toggle [value]="true">
+        Modifs à voir
+        @if (changedCount() > 0) {
+          <span class="badge-danger seats-overbooked">{{ changedCount() }}</span>
+        }
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  }
 </div>
 
 <div class="table-scroll">
@@ -48,6 +64,7 @@
           <mat-chip
             [class.badge-warn]="t.waitLevel === WaitLevel.MEDIUM"
             [class.badge-warn-strong]="t.waitLevel === WaitLevel.HIGH"
+            [class.badge-danger]="t.waitLevel === WaitLevel.MISSED"
           >
             {{ t.waitLevel | waitLevelLabel }}
           </mat-chip>
@@ -64,6 +81,21 @@
         @if (isAdmin() && t.status === TripStatus.TO_RECHECK) {
           <button mat-button type="button" (click)="markAsChecked(t)">Marquer vérifié</button>
         }
+        @if (isAdmin() && t.pendingChanges?.length) {
+          <ul class="change-list">
+            @for (change of t.pendingChanges; track change.id) {
+              <li>
+                <span class="secondary">{{ change.at | date: "d MMM HH:mm" }}</span>
+                @for (line of change.lines; track $index) {
+                  <div>{{ line }}</div>
+                }
+              </li>
+            }
+          </ul>
+          @if (t.status !== TripStatus.TO_RECHECK) {
+            <button mat-button type="button" (click)="acknowledgeChanges(t)">Vu</button>
+          }
+        }
       </td>
     </ng-container>
 
@@ -75,7 +107,7 @@
             class="inline-select"
             emptyLabel="Aucune"
             placeholder="Choisir une navette"
-            [options]="shuttleOptions()"
+            [options]="shuttleOptionsByRow().get(t.id) ?? []"
             [value]="t.shuttleId"
             (valueChange)="onShuttleChange(t, $event)"
           />

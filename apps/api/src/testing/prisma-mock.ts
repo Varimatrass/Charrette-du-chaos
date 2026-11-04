@@ -28,6 +28,7 @@ export interface PrismaMock {
   driverAvailabilitySlot: MockedDelegate;
   station: MockedDelegate;
   car: MockedDelegate;
+  tripChange: MockedDelegate;
   $transaction: Mock;
   $queryRaw: Mock;
 }
@@ -54,6 +55,7 @@ export function createPrismaMock(): PrismaMock {
     driverAvailabilitySlot: mockDelegate(),
     station: mockDelegate(),
     car: mockDelegate(),
+    tripChange: mockDelegate(),
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   };

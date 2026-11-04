@@ -59,7 +59,7 @@ describe("Trips (e2e)", () => {
         .set(t.asPax(token))
         .send({})
         .expect(200);
-      expect(body).toMatchObject({ direction: "RETURN", mode: null, status: "PENDING" });
+      expect(body).toMatchObject({ direction: "RETURN", mode: null, status: "NO_SHUTTLE" });
     });
 
     it("marks an assigned trip as TO_RECHECK when the pax edits it, keeping the shuttle", async () => {
@@ -89,6 +89,24 @@ describe("Trips (e2e)", () => {
         .set(t.asPax(token))
         .send({ status: "ASSIGNED" })
         .expect(400);
+    });
+
+    it("keeps trip days coherent with the event and with each other (B9)", async () => {
+      const put = (direction: string, body: object) =>
+        t.http().put(`/pax/me/trips/${direction}`).set(t.asPax(token)).send(body);
+
+      await put("OUTBOUND", { mode: "TRAIN", time: "8h" }).expect(400);
+      const late = await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-21" }).expect(400);
+      expect(late.body.message).toMatch(/se termine le dimanche 20 septembre/);
+      await put("RETURN", { mode: "TRAIN", day: "2026-09-17" }).expect(400);
+
+      // Arriver en avance ou repartir plus tard, c'est possible.
+      await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-17" }).expect(200);
+      await put("RETURN", { mode: "TRAIN", day: "2026-09-22" }).expect(200);
+
+      await put("OUTBOUND", { mode: "TRAIN", day: "2026-09-19" }).expect(200);
+      const before = await put("RETURN", { mode: "TRAIN", day: "2026-09-18" }).expect(400);
+      expect(before.body.message).toMatch(/avant ton arrivée/);
     });
 
     it("requires a pax token", async () => {
@@ -237,6 +255,91 @@ describe("Trips (e2e)", () => {
       expect(cars.body[0].passengers.OUTBOUND).toEqual([{ paxId, name: "Alix Moreau" }]);
     });
 
+    it("a driver cannot reduce their seats below the passengers already in (B6)", async () => {
+      const driver = await make.pax(eventId, { name: "Fanta" });
+      const car = await make.car(eventId, driver.id, { seats: 2 });
+      await make.trip(eventId, paxId, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: car.id,
+        status: "NO_SHUTTLE",
+      });
+      const { body } = await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(driver.accessToken))
+        .send({ name: "Twingo verte", seats: 0, lendingMode: "NOT_AVAILABLE" })
+        .expect(400);
+      expect(body.message).toMatch(/Alix Moreau/);
+      await t
+        .http()
+        .put("/pax/me/car")
+        .set(t.asPax(driver.accessToken))
+        .send({ name: "Twingo verte", seats: 1, lendingMode: "NOT_AVAILABLE" })
+        .expect(200);
+    });
+
+    it("a passenger can name a car not in the list yet: it is created ownerless, then claimed by its driver (Q6)", async () => {
+      const put = (pax: string, body: object) =>
+        t.http().put("/pax/me/trips/OUTBOUND").set(t.asPax(pax)).send(body);
+      const first = await put(token, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        newCarName: "Le van de Lou",
+        newCarSeats: 2,
+      }).expect(200);
+      const car = await t.prisma.car.findUniqueOrThrow({ where: { id: first.body.carId } });
+      expect(car).toMatchObject({ ownerPaxId: null, name: "Le van de Lou", seats: 2 });
+
+      // Un·e autre passager·e qui tape le même nom monte dans la même voiture.
+      const other = await make.pax(eventId, { name: "Camille" });
+      const second = await put(other.accessToken, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        newCarName: "le van de lou",
+      }).expect(200);
+      expect(second.body.carId).toBe(car.id);
+
+      const cars = await t.http().get("/pax/me/cars").set(t.asPax(token)).expect(200);
+      expect(cars.body[0]).toMatchObject({ name: "Le van de Lou", owner: null });
+
+      // Lou s'inscrit et revendique sa voiture.
+      const lou = await make.pax(eventId, { name: "Lou" });
+      await t.http().post(`/pax/me/cars/${car.id}/claim`).set(t.asPax(lou.accessToken)).expect(201);
+      expect(await t.prisma.car.findUniqueOrThrow({ where: { id: car.id } })).toMatchObject({
+        ownerPaxId: lou.id,
+      });
+      expect((await t.prisma.pax.findUniqueOrThrow({ where: { id: lou.id } })).hasVehicle).toBe(
+        true,
+      );
+      // Déjà revendiquée : refusé pour les autres.
+      await t
+        .http()
+        .post(`/pax/me/cars/${car.id}/claim`)
+        .set(t.asPax(other.accessToken))
+        .expect(400);
+    });
+
+    it("a passenger who claims the car they ride in becomes its driver", async () => {
+      const car = await make.car(eventId, null, { name: "Kangoo" });
+      await make.trip(eventId, paxId, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: car.id,
+        status: "NO_SHUTTLE",
+      });
+      await t.http().post(`/pax/me/cars/${car.id}/claim`).set(t.asPax(token)).expect(201);
+      expect(
+        await t.prisma.trip.findUniqueOrThrow({
+          where: { paxId_direction: { paxId, direction: "OUTBOUND" } },
+        }),
+      ).toMatchObject({ carpoolRole: "DRIVER", carId: car.id });
+
+      // Une seule voiture par pax.
+      const another = await make.car(eventId, null, { name: "Autre" });
+      await t.http().post(`/pax/me/cars/${another.id}/claim`).set(t.asPax(token)).expect(400);
+    });
+
     it("deleting one's car sends its passengers back to 'looking for a carpool'", async () => {
       await t
         .http()
@@ -261,6 +364,10 @@ describe("Trips (e2e)", () => {
         lookingForCarpool: true,
         carpoolRole: "PASSENGER",
       });
+      // B11 : le pax n'a plus de véhicule.
+      expect((await t.prisma.pax.findUniqueOrThrow({ where: { id: paxId } })).hasVehicle).toBe(
+        false,
+      );
     });
   });
 
@@ -357,6 +464,113 @@ describe("Trips (e2e)", () => {
         .set(t.asPax(token))
         .send({ shuttleId: returnShuttle.id })
         .expect(404);
+    });
+  });
+
+  describe("shuttles are for trips by train only", () => {
+    it("leaving the train frees the shuttle seat and marks the trip NO_SHUTTLE (B2)", async () => {
+      const shuttle = await make.shuttle(eventId);
+      await make.trip(eventId, paxId, { shuttleId: shuttle.id, status: "ASSIGNED" });
+
+      const { body } = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "CARPOOL", origin: "Lyon", carpoolRole: "PASSENGER" })
+        .expect(200);
+      expect(body).toMatchObject({ shuttleId: null, status: "NO_SHUTTLE" });
+
+      const train = await t
+        .http()
+        .put("/pax/me/trips/OUTBOUND")
+        .set(t.asPax(token))
+        .send({ mode: "TRAIN" })
+        .expect(200);
+      expect(train.body).toMatchObject({ shuttleId: null, status: "PENDING" });
+    });
+
+    it("a pax not coming by train cannot take a shuttle, neither can the admin place them (B3)", async () => {
+      const shuttle = await make.shuttle(eventId);
+      const trip = await make.trip(eventId, paxId, { mode: "OTHER", status: "NO_SHUTTLE" });
+
+      const self = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+      expect(self.body.message).toMatch(/train/);
+
+      await t
+        .http()
+        .patch(`/admin/trips/${trip.id}/assign`)
+        .set(t.asAdmin)
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+    });
+
+    it("a pax cannot take a shuttle running another day than their trip (B7)", async () => {
+      const shuttle = await make.shuttle(eventId, { day: new Date("2026-07-10") });
+      await make.trip(eventId, paxId, { day: new Date("2026-07-11") });
+
+      const { body } = await t
+        .http()
+        .patch("/pax/me/trips/OUTBOUND/shuttle")
+        .set(t.asPax(token))
+        .send({ shuttleId: shuttle.id })
+        .expect(400);
+      expect(body.message).toMatch(/vendredi 10 juillet.*samedi 11 juillet/);
+    });
+  });
+
+  describe("history of changes to recheck (P2)", () => {
+    it("records what the pax changed on a placed trip, shows it to the admin until it is acknowledged", async () => {
+      const shuttle = await make.shuttle(eventId, { label: "Navette 1" });
+      const trip = await make.trip(eventId, paxId, {
+        day: new Date("2026-09-18"),
+        stationId,
+        shuttleId: shuttle.id,
+        status: "ASSIGNED",
+      });
+      const put = (body: object) =>
+        t.http().put("/pax/me/trips/OUTBOUND").set(t.asPax(token)).send(body);
+
+      // Rien de neuf : pas de "à revérifier", pas d'historique.
+      const same = await put({ mode: "TRAIN", day: "2026-09-18", time: "08:05", stationId });
+      expect(same.body.status).toBe("ASSIGNED");
+
+      await put({ mode: "TRAIN", day: "2026-09-18", time: "09:40", stationId }).expect(200);
+      const list = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      const row = list.body.find((r: { id: string }) => r.id === trip.id);
+      expect(row.status).toBe("TO_RECHECK");
+      expect(row.pendingChanges).toHaveLength(1);
+      expect(row.pendingChanges[0].changes).toEqual([
+        { field: "time", before: "08:05", after: "09:40" },
+      ]);
+
+      // "Marquer vérifié" acquitte l'historique.
+      await t
+        .http()
+        .patch(`/admin/trips/${trip.id}/status`)
+        .set(t.asAdmin)
+        .send({ status: "ASSIGNED" })
+        .expect(200);
+      const after = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      expect(after.body.find((r: { id: string }) => r.id === trip.id).pendingChanges).toEqual([]);
+
+      // Quitter le train : l'orga voit que le pax est sorti de la navette.
+      await put({ mode: "OTHER" }).expect(200);
+      const left = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      const leftRow = left.body.find((r: { id: string }) => r.id === trip.id);
+      expect(leftRow.status).toBe("NO_SHUTTLE");
+      expect(leftRow.pendingChanges[0].changes).toEqual(
+        expect.arrayContaining([
+          { field: "mode", before: "TRAIN", after: "OTHER" },
+          { field: "shuttle", before: "Navette 1", after: null },
+        ]),
+      );
+      await t.http().post(`/admin/trips/${trip.id}/acknowledge-changes`).set(t.asAdmin).expect(204);
+      expect(await t.prisma.tripChange.count({ where: { acknowledgedAt: null } })).toBe(0);
     });
   });
 

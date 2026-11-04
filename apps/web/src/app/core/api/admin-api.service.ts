@@ -48,6 +48,10 @@ export class AdminApiService {
 
   // ---- Pax ----
 
+  deletePax(id: string): Observable<void> {
+    return this.http.delete<void>(apiUrl(`admin/pax/${id}`));
+  }
+
   listPaxs(eventId: string): Observable<PaxAdminWithTrips[]> {
     return this.http.get<PaxAdminWithTrips[]>(apiUrl("admin/pax"), { params: { eventId } });
   }
@@ -91,6 +95,10 @@ export class AdminApiService {
     return this.http.patch<Shuttle>(apiUrl(`admin/shuttles/${id}`), input);
   }
 
+  deleteShuttle(id: string): Observable<void> {
+    return this.http.delete<void>(apiUrl(`admin/shuttles/${id}`));
+  }
+
   // ---- Trajets ----
 
   listTrips(eventId: string, filters: { status?: TripStatus; direction?: Direction } = {}) {
@@ -102,6 +110,10 @@ export class AdminApiService {
 
   assignTrip(id: string, input: AssignTripInput): Observable<Trip> {
     return this.http.patch<Trip>(apiUrl(`admin/trips/${id}/assign`), input);
+  }
+
+  acknowledgeTripChanges(id: string): Observable<void> {
+    return this.http.post<void>(apiUrl(`admin/trips/${id}/acknowledge-changes`), null);
   }
 
   setTripStatus(id: string, input: SetTripStatusInput): Observable<Trip> {

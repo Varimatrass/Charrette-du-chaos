@@ -45,10 +45,19 @@
       [(value)]="driverPaxId"
       hint="Les pax partant·es pour conduire ce jour-là sont en tête de liste."
     />
-    <mat-form-field appearance="outline">
-      <mat-label>Véhicule</mat-label>
-      <input matInput formControlName="vehicle" />
-    </mat-form-field>
+    <app-entity-select
+      label="Véhicule"
+      emptyLabel="Pas encore choisi"
+      [options]="vehicleOptions()"
+      [(value)]="vehicleCarId"
+      [allowCreate]="true"
+      createLabel="Ajouter le véhicule"
+      hint="Une voiture de l'évènement, ou tape le nom d'un véhicule qui n'y est pas."
+      (create)="onCreateVehicle($event)"
+    />
+    @if (vehicleWarning(); as warning) {
+      <p class="notice notice-warn full-width">⚠ {{ warning }}</p>
+    }
     <mat-form-field appearance="outline">
       <mat-label>Heure de départ (du lieu)</mat-label>
       <input matInput type="time" formControlName="departureTime" />
@@ -72,13 +81,32 @@
     <button mat-flat-button color="primary" type="submit" class="full-width">
       {{ editingShuttleId() ? "Enregistrer les modifications" : "Créer la navette" }}
     </button>
+    @if (editingShuttleId()) {
+      <button
+        mat-stroked-button
+        color="warn"
+        type="button"
+        class="full-width"
+        (click)="deleteShuttle()"
+      >
+        <mat-icon>delete</mat-icon>
+        Supprimer la navette
+      </button>
+    }
   </form>
 
   @if (editingShuttle(); as editing) {
     <div class="detail-panel">
       <h3>
-        Passager·es de {{ editing.label }} ({{ editing.passengers.length }} /
-        {{ editing.capacity }})
+        Passager·es de {{ editing.label }}
+        <span [class.text-danger]="editing.passengers.length > editing.capacity">
+          ({{ editing.passengers.length }} / {{ editing.capacity }})
+        </span>
+        @if (editing.passengers.length > editing.capacity) {
+          <span class="badge-danger seats-overbooked">
+            surbookée +{{ editing.passengers.length - editing.capacity }}
+          </span>
+        }
       </h3>
       @if (editing.passengers.length === 0) {
         <p class="hint">Personne pour l'instant.</p>
@@ -101,8 +129,10 @@
                   class="wait-badge"
                   [class.badge-warn]="trip.waitLevel === WaitLevel.MEDIUM"
                   [class.badge-warn-strong]="trip.waitLevel === WaitLevel.HIGH"
+                  [class.badge-danger]="trip.waitLevel === WaitLevel.MISSED"
                 >
-                  attente {{ trip.waitLevel | waitLevelLabel }}
+                  {{ trip.waitLevel === WaitLevel.MISSED ? "" : "attente "
+                  }}{{ trip.waitLevel | waitLevelLabel }}
                 </span>
               }
             </li>
@@ -148,8 +178,8 @@
       <th mat-header-cell *matHeaderCellDef>Conducteur·ice</th>
       <td mat-cell *matCellDef="let s">
         {{ s.driverPax?.name || "?" }}
-        @if (s.vehicle) {
-          <span class="secondary">({{ s.vehicle }})</span>
+        @if (s.vehicleCar) {
+          <span class="secondary">({{ s.vehicleCar.name }})</span>
         }
         @if (s.driverContactPhone) {
           <br />
@@ -159,7 +189,19 @@
     </ng-container>
     <ng-container matColumnDef="seats">
       <th mat-header-cell *matHeaderCellDef>Places restantes</th>
-      <td mat-cell *matCellDef="let s">{{ s.remainingSeats }} / {{ s.capacity }}</td>
+      <td mat-cell *matCellDef="let s">
+        @if (s.remainingSeats < 0) {
+          <span class="text-danger">{{ s.remainingSeats }} / {{ s.capacity }}</span>
+          <span
+            class="badge-danger seats-overbooked"
+            [title]="s.capacity - s.remainingSeats + ' passager·es pour ' + s.capacity + ' places'"
+          >
+            surbookée +{{ -s.remainingSeats }}
+          </span>
+        } @else {
+          {{ s.remainingSeats }} / {{ s.capacity }}
+        }
+      </td>
     </ng-container>
     <ng-container matColumnDef="passengers">
       <th mat-header-cell *matHeaderCellDef>Avec qui</th>

@@ -28,12 +28,14 @@ export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
   [TripStatus.PENDING]: "En attente",
   [TripStatus.ASSIGNED]: "Assigné",
   [TripStatus.TO_RECHECK]: "À revérifier",
+  [TripStatus.NO_SHUTTLE]: "Sans navette",
 };
 
 export const WAIT_LEVEL_LABELS: Record<WaitLevel, string> = {
   [WaitLevel.OK]: "ok",
   [WaitLevel.MEDIUM]: "moyenne",
   [WaitLevel.HIGH]: "élevée",
+  [WaitLevel.MISSED]: "navette ratée",
 };
 
 export const CARPOOL_ROLE_LABELS: Record<CarpoolRole, string> = {

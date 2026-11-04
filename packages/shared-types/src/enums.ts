@@ -35,11 +35,16 @@ export type TransportMode = (typeof TransportMode)[keyof typeof TransportMode];
  * Statut d'un trajet côté organisation des navettes.
  * Volontairement non bloquant pour le pax : un trajet "TO_RECHECK" reste
  * modifiable, ce statut sert seulement de signal pour les organisateur·ices.
+ *
+ * Les navettes ne concernent que les trajets en train : PENDING (cherche une
+ * navette), ASSIGNED et TO_RECHECK ne s'appliquent qu'à eux. Tous les autres
+ * trajets (covoit, autre, pas encore décidé) sont NO_SHUTTLE.
  */
 export const TripStatus = {
   PENDING: "PENDING",
   ASSIGNED: "ASSIGNED",
   TO_RECHECK: "TO_RECHECK",
+  NO_SHUTTLE: "NO_SHUTTLE",
 } as const;
 export type TripStatus = (typeof TripStatus)[keyof typeof TripStatus];
 
@@ -51,6 +56,12 @@ export const WaitLevel = {
   OK: "OK", // < 30 min
   MEDIUM: "MEDIUM", // >= 30 min (jaune dans le Sheet d'origine)
   HIGH: "HIGH", // >= 1h (orange dans le Sheet d'origine)
+  /**
+   * Écart négatif : à l'aller le train arrive après le passage de la navette,
+   * au retour la navette arrive en gare après le départ du train. Le pax rate
+   * sa navette (ou son train) : c'est la pire situation, affichée en rouge.
+   */
+  MISSED: "MISSED",
 } as const;
 export type WaitLevel = (typeof WaitLevel)[keyof typeof WaitLevel];
 

@@ -5,6 +5,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -33,6 +36,13 @@ export class CarsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteMine(@CurrentPax() pax: Pax) {
     return this.carsService.deleteMine(pax);
+  }
+
+  /** Revendiquer une voiture sans propriétaire : "c'est la mienne". */
+  @UseGuards(PaxTokenGuard)
+  @Post("pax/me/cars/:id/claim")
+  claim(@CurrentPax() pax: Pax, @Param("id", ParseUUIDPipe) id: string) {
+    return this.carsService.claim(pax, id);
   }
 
   /** Voitures de son évènement, pour choisir celle où l'on a une place. */

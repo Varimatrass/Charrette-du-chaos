@@ -1,5 +1,15 @@
+import { IsDay, IsTime } from "../../common/validation/date-time.js";
 import { OmitType, PartialType } from "@nestjs/mapped-types";
-import { IsIn, IsInt, IsNotEmpty, IsString, Min, ValidateIf } from "class-validator";
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Min,
+  ValidateIf,
+  IsBoolean,
+  IsOptional,
+} from "class-validator";
 import { Direction } from "@desordre/shared-types";
 import type { UpdateShuttleInput } from "@desordre/shared-types";
 import { CreateShuttleDto } from "./create-shuttle.dto.js";
@@ -31,8 +41,7 @@ export class UpdateShuttleDto
   label?: string;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsDay()
   day?: string;
 
   @IfPresent()
@@ -40,17 +49,20 @@ export class UpdateShuttleDto
   direction?: Direction;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsTime()
   departureTime?: string;
 
   @IfPresent()
-  @IsString()
-  @IsNotEmpty()
+  @IsTime()
   stationArrivalTime?: string;
 
   @IfPresent()
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  /** Retire les passager·es rendu·es incompatibles par la modif (sinon 409). */
+  @IsOptional()
+  @IsBoolean()
+  removeIncompatible?: boolean;
 }

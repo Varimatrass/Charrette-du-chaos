@@ -19,7 +19,8 @@ src/
     decorators/            # @CurrentPax()
     pipes/                 # ParseEnumValuePipe pour nos enums `as const`
     dto/                   # DTO de query string communs (eventId)
-    utils/                 # wait-level (attente en gare), dates, objects (omitUndefined...)
+    validation/            # @IsTime() (HH:mm) et @IsDay() (AAAA-MM-JJ)
+    utils/                 # wait-level (attente en gare), dates (jours, bornes de l'évènement), objects
   prisma/                  # PrismaService (connexion avec tentatives au démarrage)
   events/ stations/ pax/ cars/ trips/ shuttles/ driver-availability/
                            # un module Nest par ressource : controller + service + dto/
@@ -42,9 +43,14 @@ prisma/
   (navette), `trip` (trajet aller ou retour d'un pax), `direction`
   (`OUTBOUND` = aller vers le lieu, `RETURN` = retour vers la gare),
   `station` (gare d'un évènement, `preferredStationId` = celle desservie par
-  les navettes), `car` (la voiture d'un pax, une par pax et par évènement,
-  avec son mode de prêt), `carpool role` (`DRIVER`/`PASSENGER` sur un
-  trajet en covoiturage), `wait level` (indicateur d'attente en gare).
+  les navettes), `car` (une voiture de l'évènement avec son mode de prêt :
+  celle d'un pax — une par pax — ou sans propriétaire, revendicable),
+  `carpool role` (`DRIVER`/`PASSENGER` sur un trajet en covoiturage),
+  `wait level` (indicateur d'attente en gare, `MISSED` = navette ratée),
+  `trip change` (ce qu'un pax a modifié sur un trajet placé dans une
+  navette, à revérifier par l'orga).
+- **Navettes = trains :** seuls les trajets en train vont dans une navette.
+  Les autres sont `NO_SHUTTLE` ; quitter le train fait sortir de la navette.
 - **Routes :** `/events` (lecture publique : seulement les évènements
   `openToPaxs`, sauf `/events/:id` qui marche toujours), `/pax` (inscription
   publique), `/pax/me/...` (auto-service avec `x-pax-token` : infos, voiture,

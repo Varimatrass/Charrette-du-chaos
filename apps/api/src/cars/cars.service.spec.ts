@@ -6,6 +6,7 @@ import { CarsService, toCarOverview } from "./cars.service.js";
 const carWithTrips = (seats = 1) => ({
   ...makeCar({ seats, ownerPaxId: OTHER_PAX_ID }),
   ownerPax: { id: OTHER_PAX_ID, name: "Bilal" },
+  _count: { shuttles: 0 },
   trips: [
     {
       direction: "OUTBOUND" as const,
@@ -53,6 +54,25 @@ describe("CarsService", () => {
     });
   });
 
+  it("refuses to go below the passengers already declared in a direction (B6)", async () => {
+    prisma.car.findUnique.mockResolvedValue({
+      ...makeCar({ ownerPaxId: pax.id, seats: 3 }),
+      ownerPax: { id: pax.id, name: pax.name },
+      _count: { shuttles: 0 },
+      trips: [
+        { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p1", name: "Bilal" } },
+        { direction: "RETURN", carpoolRole: "PASSENGER", pax: { id: "p2", name: "Kim" } },
+      ],
+    });
+    await expect(
+      service.upsertMine(pax, { name: "Twingo", seats: 1, lendingMode: "NOT_AVAILABLE" }),
+    ).rejects.toThrow(/2 passager·es au retour \(Bilal, Kim\).*1 place/);
+    expect(prisma.car.upsert).not.toHaveBeenCalled();
+
+    await service.upsertMine(pax, { name: "Twingo", seats: 2, lendingMode: "NOT_AVAILABLE" });
+    expect(prisma.car.upsert).toHaveBeenCalled();
+  });
+
   describe("deleteMine", () => {
     it("deletes the car and puts its passengers back to 'looking for a carpool'", async () => {
       prisma.car.findUnique.mockResolvedValue(makeCar({ ownerPaxId: pax.id }));
@@ -63,6 +83,11 @@ describe("CarsService", () => {
         data: { lookingForCarpool: true },
       });
       expect(prisma.car.delete).toHaveBeenCalledWith({ where: { id: CAR_ID } });
+      // B11 : plus de voiture, plus de véhicule.
+      expect(prisma.pax.update).toHaveBeenCalledWith({
+        where: { id: pax.id },
+        data: { hasVehicle: false },
+      });
     });
 
     it("throws a 404 when the pax has no car", async () => {

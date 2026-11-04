@@ -7,10 +7,12 @@ import { MatCardModule } from "@angular/material/card";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
 import { MatListModule } from "@angular/material/list";
+import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import type { EventWithStations } from "@desordre/shared-types";
 import { EventsApiService } from "../../../core/api/events-api.service";
 import { appLinks } from "../../../core/app-paths";
 
+import { apiErrorMessage } from "../../../core/utils/http-errors";
 @Component({
   selector: "app-admin-events",
   standalone: true,
@@ -23,12 +25,14 @@ import { appLinks } from "../../../core/app-paths";
     MatFormFieldModule,
     MatInputModule,
     MatListModule,
+    MatSnackBarModule,
   ],
   templateUrl: "./admin-events.component.html",
   styleUrl: "./admin-events.component.scss",
 })
 export class AdminEventsComponent {
   private readonly eventsApi = inject(EventsApiService);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly events = signal<EventWithStations[]>([]);
   readonly showForm = signal(false);
@@ -65,10 +69,16 @@ export class AdminEventsComponent {
       .split(",")
       .map((name) => name.trim())
       .filter((name) => name.length > 0);
-    this.eventsApi.create({ ...details, stations: stationNames }).subscribe(() => {
-      this.form.reset();
-      this.showForm.set(false);
-      this.load();
+    this.eventsApi.create({ ...details, stations: stationNames }).subscribe({
+      next: () => {
+        this.form.reset();
+        this.showForm.set(false);
+        this.load();
+      },
+      error: (error: unknown) =>
+        this.snackBar.open(apiErrorMessage(error, "Échec de la création, réessaie."), undefined, {
+          duration: 4000,
+        }),
     });
   }
 }

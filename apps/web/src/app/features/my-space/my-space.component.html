@@ -140,6 +140,38 @@
           Déclarer ma voiture
         </button>
       }
+
+      @if (!myCar() && ownerlessCars().length > 0) {
+        <h3>Ta voiture est peut-être déjà là</h3>
+        <p class="hint">
+          Des passager·es ont déjà déclaré ces voitures sans savoir à qui elles sont. Si c'est la
+          tienne, revendique-la : ses passager·es restent dedans et tu en deviens le/la
+          conducteur·ice.
+        </p>
+        <ul class="ownerless-cars">
+          @for (car of ownerlessCars(); track car.id) {
+            <li>
+              <strong>{{ car.name }}</strong>
+              <span class="hint">
+                @if (car.isShuttleVehicle) {
+                  (véhicule de navette)
+                } @else {
+                  ({{ car.passengers.OUTBOUND.length + car.passengers.RETURN.length }}
+                  passager·e(s) déclaré·e(s))
+                }
+              </span>
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="savingCar()"
+                (click)="claimCar(car.id, car.name)"
+              >
+                C'est la mienne
+              </button>
+            </li>
+          }
+        </ul>
+      }
     </mat-card>
 
     @if (pax()?.willingToDriveShuttle) {
@@ -183,7 +215,14 @@
         >
           <mat-form-field appearance="outline">
             <mat-label>Jour</mat-label>
-            <input matInput type="date" formControlName="day" required />
+            <input
+              matInput
+              type="date"
+              formControlName="day"
+              required
+              [attr.min]="eventStart()"
+              [attr.max]="eventEnd()"
+            />
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>À partir de (optionnel)</mat-label>

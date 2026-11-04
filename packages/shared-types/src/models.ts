@@ -42,11 +42,16 @@ export interface Station {
   updatedAt: string;
 }
 
-/** Voiture d'un pax venant en covoiturage : au plus une par pax et par évènement. */
+/**
+ * Voiture d'un pax venant en covoiturage : au plus une par pax et par évènement.
+ * Peut n'appartenir à personne (`ownerPaxId` null) : créée par un pax passager·e
+ * d'un·e conducteur·ice pas inscrit·e, ou par l'orga pour une navette. Un pax
+ * peut ensuite la revendiquer.
+ */
 export interface Car {
   id: string;
   eventId: string;
-  ownerPaxId: string;
+  ownerPaxId: string | null;
   name: string;
   /** Places disponibles pour des passager·es (hors conducteur·ice). */
   seats: number;
@@ -64,7 +69,10 @@ export interface CarOverview {
   name: string;
   seats: number;
   lendingMode: VehicleLendingMode;
-  owner: { id: string; name: string };
+  /** `null` = voiture sans propriétaire (conducteur·ice pas inscrit·e, ou véhicule de l'orga). */
+  owner: { id: string; name: string } | null;
+  /** Utilisée comme véhicule d'au moins une navette. */
+  isShuttleVehicle: boolean;
   /** Passager·es déjà déclaré·es, par direction. */
   passengers: Record<Direction, PassengerName[]>;
   remainingSeats: Record<Direction, number>;
@@ -112,6 +120,8 @@ export interface Trip {
   /** Train : gare d'arrivée (aller) / de départ (retour). */
   stationId: string | null;
   shuttleId: string | null;
+  /** Moment de l'entrée dans la navette (les dernier·es arrivé·es sortent en premier). */
+  shuttleAssignedAt: string | null;
   status: TripStatus;
   /** Covoiturage : d'où le pax part (aller) / où iel rentre (retour). */
   origin: string | null;
@@ -130,7 +140,8 @@ export interface Shuttle {
   label: string;
   day: IsoDate;
   direction: Direction;
-  vehicle: string | null;
+  /** Véhicule utilisé : une voiture de l'évènement (prêtée par un pax, ou sans propriétaire). */
+  vehicleCarId: string | null;
   departureTime: IsoTime;
   stationArrivalTime: IsoTime;
   venueReturnTime: IsoTime | null;
@@ -142,17 +153,54 @@ export interface Shuttle {
   updatedAt: string;
 }
 
+/** Ce qui peut changer sur un trajet et intéresser l'orga qui a placé le pax dans une navette. */
+export type TripChangeField = "mode" | "day" | "time" | "station" | "comment" | "shuttle";
+
+/**
+ * Un champ modifié, avant → après, en clair : `mode` est une valeur de
+ * TransportMode, `day` un jour AAAA-MM-JJ, `station` / `shuttle` des noms.
+ * `null` = vide / pas encore décidé.
+ */
+export interface TripFieldChange {
+  field: TripChangeField;
+  before: string | null;
+  after: string | null;
+}
+
+/** Une modification faite par le pax sur un trajet placé dans une navette. */
+export interface TripChange {
+  id: string;
+  tripId: string;
+  changes: TripFieldChange[];
+  /** `null` tant que l'orga ne l'a pas marquée comme vue. */
+  acknowledgedAt: string | null;
+  createdAt: string;
+}
+
 /** Un trajet avec le pax qu'il concerne, pour l'affichage admin. */
 export interface TripWithPax extends Trip {
   pax: Pax;
   station: Station | null;
   waitLevel: WaitLevel | null;
+  /** Modifications pas encore vues par l'orga, de la plus ancienne à la plus récente. */
+  pendingChanges: TripChange[];
 }
 
-/** Une navette avec ses places restantes calculées et le nom de son/sa conducteur·ice. */
+/** Le véhicule d'une navette tel qu'affiché : son nom, à qui il est, s'il est prêté. */
+export interface ShuttleVehicle {
+  id: string;
+  name: string;
+  /** `null` = voiture sans propriétaire. */
+  ownerPaxId: string | null;
+  ownerName: string | null;
+  lendingMode: VehicleLendingMode;
+}
+
+/** Une navette avec ses places restantes calculées, le nom de son/sa conducteur·ice et son véhicule. */
 export interface ShuttleWithRemainingSeats extends Shuttle {
   remainingSeats: number;
   driverPax: { id: string; name: string } | null;
+  vehicleCar: ShuttleVehicle | null;
 }
 
 /**
@@ -178,6 +226,26 @@ export interface PassengerName {
 export interface ShuttleWithPassengerNames extends ShuttleWithRemainingSeats {
   passengers: PassengerName[];
   driverContactPhone: string | null;
+}
+
+/** Pourquoi un·e passager·e ne tiendrait plus dans une navette modifiée. */
+export type ShuttleIncompatibilityReason = "DIRECTION" | "DAY" | "CAPACITY";
+
+export interface IncompatiblePassenger {
+  tripId: string;
+  paxName: string;
+  reason: ShuttleIncompatibilityReason;
+}
+
+/**
+ * Réponse 409 de PATCH /admin/shuttles/:id quand la modification (sens, jour,
+ * capacité) rend des passager·es incompatibles : rien n'est enregistré, l'orga
+ * confirme en renvoyant la même modif avec `removeIncompatible: true`.
+ */
+export interface ShuttleUpdateConflict {
+  statusCode: 409;
+  message: string;
+  incompatible: IncompatiblePassenger[];
 }
 
 /** Une navette avec la liste complète de ses passager·es, coordonnées incluses (back-office uniquement). */
@@ -215,6 +283,7 @@ export interface DriverAvailabilitySlotWithPax extends DriverAvailabilitySlot {
 export interface PaxOverviewTrip {
   direction: Direction;
   mode: TransportMode | null;
+  stationId: string | null;
   status: TripStatus;
   shuttleId: string | null;
   carpoolRole: CarpoolRole | null;
@@ -224,12 +293,14 @@ export interface PaxOverviewTrip {
 
 /**
  * Vue "annuaire" d'un pax pour les autres paxs de son évènement : jamais
- * ses coordonnées de contact (email/téléphone) ni son jeton d'accès —
- * seulement son nom, comment iel vient et ce qu'iel cherche.
+ * son email, son téléphone ni son jeton d'accès — seulement son nom, son
+ * pseudo Discord (tout le monde est sur le même serveur Discord de
+ * l'évènement), comment iel vient et ce qu'iel cherche.
  */
 export interface PaxOverview {
   id: string;
   name: string;
+  discordHandle: string | null;
   trips: PaxOverviewTrip[];
 }
 

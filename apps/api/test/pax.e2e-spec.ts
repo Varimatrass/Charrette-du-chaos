@@ -111,7 +111,7 @@ describe("Pax (e2e)", () => {
         .expect(400);
     });
 
-    it("GET /pax/me/paxs lists the other paxs with a trip summary and no contact details", async () => {
+    it("GET /pax/me/paxs lists the other paxs with their Discord and a trip summary, no email/phone (Q1)", async () => {
       const me = await make.pax(eventId, { name: "Moi" });
       const bilal = await make.pax(eventId, {
         name: "Bilal",
@@ -136,10 +136,12 @@ describe("Pax (e2e)", () => {
       expect(bilalOverview).toEqual({
         id: bilal.id,
         name: "Bilal",
+        discordHandle: "bilal#1",
         trips: [
           {
             direction: "OUTBOUND",
             mode: "CARPOOL",
+            stationId: null,
             status: "PENDING",
             shuttleId: null,
             carpoolRole: "PASSENGER",
@@ -148,7 +150,7 @@ describe("Pax (e2e)", () => {
           },
         ],
       });
-      expect(JSON.stringify(body)).not.toMatch(/b@example.com|0601|bilal#|secret|interne/);
+      expect(JSON.stringify(body)).not.toMatch(/b@example.com|0601|secret|interne/);
     });
   });
 
@@ -194,6 +196,41 @@ describe("Pax (e2e)", () => {
         .get("/admin/pax/11111111-1111-4111-8111-111111111111")
         .set(t.asAdmin)
         .expect(404);
+    });
+  });
+
+  describe("DELETE /admin/pax/:id (B8)", () => {
+    it("lets the admin delete a pax (e.g. a duplicate) with their trips; their shuttle loses its driver, their car stays ownerless", async () => {
+      const event = await make.event({ name: "Suppression" });
+      const pax = await make.pax(event.id, { name: "Doublon" });
+      await make.trip(event.id, pax.id);
+      const shuttle = await make.shuttle(event.id, { driverPaxId: pax.id });
+      const car = await make.car(event.id, pax.id);
+      const passenger = await make.pax(event.id, { name: "Bilal" });
+      const ride = await make.trip(event.id, passenger.id, {
+        mode: "CARPOOL",
+        carpoolRole: "PASSENGER",
+        carId: car.id,
+        status: "NO_SHUTTLE",
+      });
+
+      await t.http().delete(`/admin/pax/${pax.id}`).set(t.asPax(pax.accessToken)).expect(401);
+      await t.http().delete(`/admin/pax/${pax.id}`).set(t.asAdmin).expect(204);
+
+      expect(await t.prisma.pax.findUnique({ where: { id: pax.id } })).toBeNull();
+      expect(await t.prisma.trip.count({ where: { paxId: pax.id } })).toBe(0);
+      expect(
+        (await t.prisma.shuttle.findUniqueOrThrow({ where: { id: shuttle.id } })).driverPaxId,
+      ).toBeNull();
+      // La voiture reste, sans propriétaire : ses passager·es gardent leur place.
+      expect(await t.prisma.car.findUniqueOrThrow({ where: { id: car.id } })).toMatchObject({
+        ownerPaxId: null,
+      });
+      expect(await t.prisma.trip.findUniqueOrThrow({ where: { id: ride.id } })).toMatchObject({
+        carId: car.id,
+        lookingForCarpool: false,
+      });
+      await t.http().delete(`/admin/pax/${pax.id}`).set(t.asAdmin).expect(404);
     });
   });
 });

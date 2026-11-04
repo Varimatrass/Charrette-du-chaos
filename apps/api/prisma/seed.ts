@@ -81,6 +81,10 @@ const SHUTTLES: Record<
     direction: Direction;
     /** Nom du pax conducteur·ice (doit exister dans PAXS). */
     driver: string;
+    /**
+     * Véhicule : la voiture d'un pax si elle porte ce nom, sinon un véhicule
+     * de l'orga (voiture sans propriétaire, créée une fois par nom).
+     */
     vehicle: string;
     departureTime: string;
     stationArrivalTime: string;
@@ -426,11 +430,28 @@ async function main(): Promise<void> {
   }
 
   const shuttleIds = {} as Record<ShuttleKey, string>;
+  const vehicleIds = new Map<string, string>();
   for (const [key, shuttle] of Object.entries(SHUTTLES) as [
     ShuttleKey,
     (typeof SHUTTLES)[ShuttleKey],
   ][]) {
-    const { driver, ...data } = shuttle;
+    const { driver, vehicle, ...data } = shuttle;
+    let vehicleCarId =
+      vehicleIds.get(vehicle) ??
+      (await prisma.car.findFirst({ where: { eventId: event.id, name: vehicle } }))?.id;
+    if (!vehicleCarId) {
+      const car = await prisma.car.create({
+        data: {
+          eventId: event.id,
+          ownerPaxId: null,
+          name: vehicle,
+          seats: 4,
+          lendingMode: "AVAILABLE_ANY_DRIVER",
+        },
+      });
+      vehicleCarId = car.id;
+      vehicleIds.set(vehicle, vehicleCarId);
+    }
     const created = await prisma.shuttle.create({
       data: {
         eventId: event.id,
@@ -438,6 +459,7 @@ async function main(): Promise<void> {
         day: new Date(shuttle.day),
         capacity: 4,
         driverPaxId: paxIds.get(driver),
+        vehicleCarId,
       },
     });
     shuttleIds[key] = created.id;
@@ -456,7 +478,7 @@ async function main(): Promise<void> {
           time: trip.time ?? null,
           stationId: trip.station ? stationIds.get(trip.station) : null,
           shuttleId: trip.shuttle ? shuttleIds[trip.shuttle] : null,
-          status: trip.status ?? "PENDING",
+          status: trip.status ?? (trip.mode === "TRAIN" ? "PENDING" : "NO_SHUTTLE"),
           comment: trip.comment ?? null,
           origin: trip.origin ?? null,
           carpoolRole: trip.carpoolRole ?? null,

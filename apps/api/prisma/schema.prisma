@@ -24,10 +24,13 @@ enum TransportMode {
   OTHER
 }
 
+// PENDING / ASSIGNED / TO_RECHECK ne concernent que les trajets en train
+// (les seuls à avoir besoin d'une navette) ; tous les autres sont NO_SHUTTLE.
 enum TripStatus {
   PENDING
   ASSIGNED
   TO_RECHECK
+  NO_SHUTTLE
 }
 
 // Rôle d'un pax dans un covoiturage pour un trajet donné : conduit sa propre
@@ -93,10 +96,14 @@ model Station {
 // Voiture d'un pax venant en covoiturage : au plus une par pax et par
 // évènement. Les autres paxs peuvent s'y déclarer passager·es, et l'orga
 // peut l'utiliser pour une navette selon `lendingMode`.
+//
+// Une voiture peut n'appartenir à personne (`ownerPaxId` null) : créée par
+// un pax passager·e d'un·e conducteur·ice pas inscrit·e sur la plateforme,
+// ou par l'orga pour une navette. Un pax peut ensuite la revendiquer.
 model Car {
   id          String             @id @default(uuid())
   eventId     String             @map("event_id")
-  ownerPaxId  String             @unique @map("owner_pax_id")
+  ownerPaxId  String?            @unique @map("owner_pax_id")
   name        String
   // Places disponibles pour des passager·es (hors conducteur·ice).
   seats       Int
@@ -104,9 +111,12 @@ model Car {
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @updatedAt @map("updated_at")
 
-  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  ownerPax Pax    @relation(fields: [ownerPaxId], references: [id], onDelete: Cascade)
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  // Supprimer le pax ne supprime pas sa voiture : ses passager·es gardent
+  // leur place, la voiture devient juste "sans propriétaire".
+  ownerPax Pax?      @relation(fields: [ownerPaxId], references: [id], onDelete: SetNull)
   trips    Trip[]
+  shuttles Shuttle[]
 
   @@index([eventId])
   @@map("cars")
@@ -156,7 +166,9 @@ model Shuttle {
   label              String
   day                DateTime  @db.Date
   direction          Direction
-  vehicle            String?
+  // Véhicule utilisé pour la navette : une voiture de l'évènement (celle
+  // d'un pax qui la prête, ou une voiture sans propriétaire créée par l'orga).
+  vehicleCarId       String?   @map("vehicle_car_id")
   departureTime      String    @map("departure_time") // "HH:mm"
   stationArrivalTime String    @map("station_arrival_time") // "HH:mm"
   venueReturnTime    String?   @map("venue_return_time") // "HH:mm"
@@ -171,12 +183,14 @@ model Shuttle {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  trips     Trip[]
-  driverPax Pax?   @relation(fields: [driverPaxId], references: [id], onDelete: SetNull)
+  event      Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trips      Trip[]
+  driverPax  Pax?   @relation(fields: [driverPaxId], references: [id], onDelete: SetNull)
+  vehicleCar Car?   @relation(fields: [vehicleCarId], references: [id], onDelete: SetNull)
 
   @@index([eventId])
   @@index([driverPaxId])
+  @@index([vehicleCarId])
   @@map("shuttles")
 }
 
@@ -195,6 +209,9 @@ model Trip {
   // l'évènement.
   stationId         String?        @map("station_id")
   shuttleId         String?        @map("shuttle_id")
+  // Moment de l'entrée dans la navette : si la navette perd des places, les
+  // dernier·es arrivé·es en sortent en premier.
+  shuttleAssignedAt DateTime?      @map("shuttle_assigned_at")
   status            TripStatus     @default(PENDING)
   // Covoiturage : d'où le pax part (aller) / où iel rentre (retour), texte libre.
   origin            String?
@@ -207,11 +224,12 @@ model Trip {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
-  shuttle Shuttle? @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
-  station Station? @relation(fields: [stationId], references: [id], onDelete: SetNull)
-  car     Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  pax     Pax          @relation(fields: [paxId], references: [id], onDelete: Cascade)
+  shuttle Shuttle?     @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
+  station Station?     @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  car     Car?         @relation(fields: [carId], references: [id], onDelete: SetNull)
+  changes TripChange[]
 
   // Un pax n'a qu'un seul trajet par direction (aller / retour) et par
   // évènement. Il reste librement modifiable, jamais dupliqué.
@@ -221,6 +239,23 @@ model Trip {
   @@index([stationId])
   @@index([carId])
   @@map("trips")
+}
+
+// Modification faite par un pax sur un trajet placé dans une navette : ce qui
+// a changé (avant → après, en clair). L'orga la marque comme vue une fois
+// l'assignation revérifiée (`acknowledgedAt`).
+model TripChange {
+  id             String    @id @default(uuid())
+  tripId         String    @map("trip_id")
+  // Liste de { field, before, after } (voir TripFieldChange dans shared-types).
+  changes        Json
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_changes")
 }
 
 // Créneau où un·e pax ayant accepté de conduire des navettes se déclare

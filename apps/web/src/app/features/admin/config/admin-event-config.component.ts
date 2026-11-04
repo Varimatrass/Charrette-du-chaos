@@ -19,6 +19,7 @@ import { injectEventId } from "../event-detail/event-id";
  * (ajout, suppression, gare préférée pour les navettes) et l'ouvrir aux
  * inscriptions une fois prêt.
  */
+import { apiErrorMessage } from "../../../core/utils/http-errors";
 @Component({
   selector: "app-admin-event-config",
   standalone: true,
@@ -83,9 +84,9 @@ export class AdminEventConfigComponent {
         this.saving.set(false);
         this.notify("Évènement enregistré.");
       },
-      error: () => {
+      error: (error: unknown) => {
         this.saving.set(false);
-        this.notify("Échec de l'enregistrement, réessaie.");
+        this.notify(apiErrorMessage(error, "Échec de l'enregistrement, réessaie."));
       },
     });
   }

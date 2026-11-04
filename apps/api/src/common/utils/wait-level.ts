@@ -33,6 +33,8 @@ export function parseTimeToMinutes(time: string | null | undefined): number | nu
  * - RETURN : la navette dépose le pax en gare avant son train.
  *   Attente = heure du train − heure d'arrivée de la navette en gare.
  *
+ * Si l'écart est négatif, la navette (ou le train) est ratée : `MISSED`.
+ *
  * Renvoie `null` si une des heures manque ou est mal formée (on ne bloque
  * jamais l'affichage pour ça, on affiche juste "pas d'indicateur").
  */
@@ -47,7 +49,8 @@ export function computeWaitLevel(
 
   const delta =
     direction === Direction.OUTBOUND ? shuttleMinutes - tripMinutes : tripMinutes - shuttleMinutes;
-  const waitMinutes = Math.max(delta, 0);
+  if (delta < 0) return WaitLevel.MISSED;
+  const waitMinutes = delta;
 
   if (waitMinutes >= WAIT_LEVEL_THRESHOLDS_MIN.HIGH) return WaitLevel.HIGH;
   if (waitMinutes >= WAIT_LEVEL_THRESHOLDS_MIN.MEDIUM) return WaitLevel.MEDIUM;

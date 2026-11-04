@@ -12,18 +12,21 @@ import { UpdatePaxDto } from "./dto/update-pax.dto.js";
 export type PublicPax = Omit<Pax, "accessToken">;
 
 /**
- * Champs exposés aux autres paxs de l'évènement : le nom et comment iel
- * vient (résumé de ses trajets) — jamais de coordonnées, de commentaire ni
- * de jeton. Sélection explicite pour qu'un futur champ sensible ne fuite
- * pas ici par défaut.
+ * Champs exposés aux autres paxs de l'évènement : le nom, le pseudo Discord
+ * (tout le monde est invité sur le serveur Discord de l'évènement) et comment
+ * iel vient (résumé de ses trajets) — jamais d'email, de téléphone, de
+ * commentaire ni de jeton. Sélection explicite pour qu'un futur champ
+ * sensible ne fuite pas ici par défaut.
  */
 const PAX_OVERVIEW_SELECT = {
   id: true,
   name: true,
+  discordHandle: true,
   trips: {
     select: {
       direction: true,
       mode: true,
+      stationId: true,
       status: true,
       shuttleId: true,
       carpoolRole: true,
@@ -89,6 +92,18 @@ export class PaxService {
     const pax = await this.prisma.pax.findUnique({ where: { id } });
     if (!pax) throw new NotFoundException("Pax introuvable");
     return pax;
+  }
+
+  /**
+   * Back-office : supprime un pax (doublon, inscription par erreur…), avec
+   * ses trajets et ses dispos. S'iel conduisait une navette, la navette n'a
+   * plus de conducteur·ice ; sa voiture reste (sans propriétaire), donc ses
+   * passager·es gardent leur place.
+   */
+  async remove(id: string): Promise<void> {
+    const pax = await this.prisma.pax.findUnique({ where: { id }, select: { id: true } });
+    if (!pax) throw new NotFoundException("Pax introuvable");
+    await this.prisma.pax.delete({ where: { id } });
   }
 
   /** Vue "annuaire" des paxs de l'évènement, telle que vue par les autres paxs (voir PAX_OVERVIEW_SELECT). */

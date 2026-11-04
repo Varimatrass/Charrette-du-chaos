@@ -14,6 +14,10 @@ import { EntityOption, EntitySelectComponent } from "../entity-select/entity-sel
 /** Préfixe des gares tapées mais pas encore créées côté API (envoyées via `stationName`). */
 const NEW_STATION_PREFIX = "new:";
 
+/** Préfixe des voitures tapées mais pas encore créées côté API (envoyées via `newCarName`). */
+const NEW_CAR_PREFIX = "new:";
+const DEFAULT_NEW_CAR_SEATS = 3;
+
 /** Pour un·e passager·e : a déjà une voiture identifiée, ou en cherche une. */
 type PassengerStatus = "HAS_CAR" | "LOOKING";
 
@@ -66,6 +70,10 @@ export class TripFormComponent {
   readonly carId = signal<string | null>(null);
   /** Une gare tapée par le pax et pas encore en base, à envoyer comme `stationName`. */
   private readonly newStationName = signal<string | null>(null);
+  /** Une voiture tapée par le pax et pas encore en base, à envoyer comme `newCarName`. */
+  private readonly newCarName = signal<string | null>(null);
+  /** Places passager·es d'une voiture tapée (le pax les connaît souvent, sinon 3). */
+  readonly newCarSeats = new FormControl(DEFAULT_NEW_CAR_SEATS, { nonNullable: true });
 
   private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.value });
 
@@ -73,6 +81,9 @@ export class TripFormComponent {
   readonly carpoolRole = computed(() => this.formValue().carpoolRole ?? null);
   readonly passengerStatus = computed(() => this.formValue().passengerStatus ?? null);
   readonly isOutbound = computed(() => this.direction() === Direction.OUTBOUND);
+  /** Bornes du sélecteur de jour : on n'arrive pas après la fin, on ne repart pas avant le début. */
+  readonly eventStart = computed(() => toDateInputValue(this.event()?.startDate) || null);
+  readonly eventEnd = computed(() => toDateInputValue(this.event()?.endDate) || null);
 
   readonly stationOptions = computed<EntityOption[]>(() => {
     const options: EntityOption[] = this.stations().map((station) => ({
@@ -85,19 +96,29 @@ export class TripFormComponent {
     return options;
   });
 
-  readonly carOptions = computed<EntityOption[]>(() =>
-    this.cars()
-      .filter((car) => car.owner.id !== this.myPaxId())
+  readonly carOptions = computed<EntityOption[]>(() => {
+    const options: EntityOption[] = this.cars()
+      // Pas sa propre voiture, ni un véhicule de navette de l'orga (sans propriétaire ni passager·e).
+      .filter((car) => car.owner?.id !== this.myPaxId() && !isOrgaShuttleVehicle(car))
       .map((car) => {
         const seats = car.remainingSeats[this.direction()];
+        const seatsHint = seats > 0 ? `${seats} place${seats > 1 ? "s" : ""}` : "complet";
         return {
           id: car.id,
-          label: `${car.owner.name} — ${car.name}`,
-          hint: seats > 0 ? `${seats} place${seats > 1 ? "s" : ""}` : "complet",
+          label: car.owner ? `${car.owner.name} — ${car.name}` : car.name,
+          hint: car.owner ? seatsHint : `${seatsHint} · conducteur·ice pas encore inscrit·e`,
           disabled: seats <= 0 && car.id !== this.carId(),
         };
-      }),
-  );
+      });
+    const pending = this.newCarName();
+    if (pending) {
+      options.push({ id: NEW_CAR_PREFIX + pending, label: pending, hint: "nouvelle voiture" });
+    }
+    return options;
+  });
+
+  /** Le pax a tapé une voiture qui n'est pas encore dans la liste (on lui demande les places). */
+  readonly isNewCar = computed(() => this.carId()?.startsWith(NEW_CAR_PREFIX) ?? false);
 
   /** Le pax a dit conduire sa propre voiture pour ce trajet (le parent affiche alors le bloc voiture). */
   readonly isDriver = computed(
@@ -116,6 +137,11 @@ export class TripFormComponent {
   onCreateStation(name: string): void {
     this.newStationName.set(name);
     this.stationId.set(NEW_STATION_PREFIX + name);
+  }
+
+  onCreateCar(name: string): void {
+    this.newCarName.set(name);
+    this.carId.set(NEW_CAR_PREFIX + name);
   }
 
   /** Charge un trajet existant (mon espace). */
@@ -158,11 +184,24 @@ export class TripFormComponent {
       input.origin = emptyToUndefined(v.origin);
       input.carpoolRole = v.carpoolRole ?? undefined;
       if (v.carpoolRole === CarpoolRole.PASSENGER) {
-        if (v.passengerStatus === "HAS_CAR" && this.carId())
-          input.carId = this.carId() ?? undefined;
-        else input.lookingForCarpool = true;
+        const car = this.carId();
+        if (v.passengerStatus === "HAS_CAR" && car?.startsWith(NEW_CAR_PREFIX)) {
+          input.newCarName = car.slice(NEW_CAR_PREFIX.length);
+          input.newCarSeats = this.newCarSeats.value;
+        } else if (v.passengerStatus === "HAS_CAR" && car) {
+          input.carId = car;
+        } else input.lookingForCarpool = true;
       }
     }
     return input;
   }
+}
+
+/** Véhicule créé par l'orga pour une navette : pas une voiture de covoit. */
+function isOrgaShuttleVehicle(car: CarOverview): boolean {
+  return (
+    car.owner === null &&
+    car.isShuttleVehicle &&
+    car.passengers.OUTBOUND.length + car.passengers.RETURN.length === 0
+  );
 }

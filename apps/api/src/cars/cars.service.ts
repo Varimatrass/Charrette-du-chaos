@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Car, Pax, Prisma } from "@prisma/client";
-import type { Direction } from "@desordre/shared-types";
+import { Direction, type VehicleLendingMode } from "@desordre/shared-types";
 import type { CarOverview, PassengerName } from "@desordre/shared-types";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { UpsertCarDto } from "./dto/upsert-car.dto.js";
 
 const OVERVIEW_INCLUDE = {
   ownerPax: { select: { id: true, name: true } },
+  _count: { select: { shuttles: true } },
   trips: {
     select: { direction: true, carpoolRole: true, pax: { select: { id: true, name: true } } },
   },
@@ -26,7 +27,8 @@ export function toCarOverview(car: CarWithTrips): CarOverview {
     name: car.name,
     seats: car.seats,
     lendingMode: car.lendingMode,
-    owner: { id: car.ownerPax.id, name: car.ownerPax.name },
+    owner: car.ownerPax ? { id: car.ownerPax.id, name: car.ownerPax.name } : null,
+    isShuttleVehicle: car._count.shuttles > 0,
     passengers,
     remainingSeats: {
       OUTBOUND: car.seats - passengers.OUTBOUND.length,
@@ -39,8 +41,27 @@ export function toCarOverview(car: CarWithTrips): CarOverview {
 export class CarsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Crée ou met à jour la voiture du pax (une seule par pax). */
-  upsertMine(pax: Pax, dto: UpsertCarDto): Promise<Car> {
+  /**
+   * Crée ou met à jour la voiture du pax (une seule par pax). On ne peut pas
+   * descendre sous le nombre de passager·es déjà déclaré·es dans un sens :
+   * il faut d'abord qu'iels changent de voiture.
+   */
+  async upsertMine(pax: Pax, dto: UpsertCarDto): Promise<Car> {
+    const existing = await this.prisma.car.findUnique({
+      where: { ownerPaxId: pax.id },
+      include: OVERVIEW_INCLUDE,
+    });
+    if (existing) {
+      const { passengers } = toCarOverview(existing);
+      for (const direction of [Direction.OUTBOUND, Direction.RETURN]) {
+        const names = passengers[direction].map((p) => p.name);
+        if (names.length > dto.seats) {
+          throw new BadRequestException(
+            `Ta voiture a déjà ${names.length} passager·e${names.length > 1 ? "s" : ""} ${direction === Direction.OUTBOUND ? "à l'aller" : "au retour"} (${names.join(", ")}) : tu ne peux pas descendre à ${dto.seats} place${dto.seats > 1 ? "s" : ""}. Demande-leur de changer de voiture d'abord.`,
+          );
+        }
+      }
+    }
     return this.prisma.car.upsert({
       where: { ownerPaxId: pax.id },
       create: { eventId: pax.eventId, ownerPaxId: pax.id, ...dto },
@@ -50,7 +71,8 @@ export class CarsService {
 
   /**
    * Supprime la voiture du pax. Les trajets des passager·es qui y étaient
-   * repassent à "cherche un covoit" (la FK est en SET NULL, on remet le flag).
+   * repassent à "cherche un covoit" (la FK est en SET NULL, on remet le flag),
+   * et le pax n'a plus de véhicule.
    */
   async deleteMine(pax: Pax): Promise<void> {
     const car = await this.prisma.car.findUnique({ where: { ownerPaxId: pax.id } });
@@ -65,7 +87,59 @@ export class CarsService {
         data: { carpoolRole: null },
       }),
       this.prisma.car.delete({ where: { id: car.id } }),
+      // Plus de voiture déclarée : "a un véhicule" repasse à non (B11).
+      this.prisma.pax.update({ where: { id: pax.id }, data: { hasVehicle: false } }),
     ]);
+  }
+
+  /**
+   * Voiture sans propriétaire : celle d'un·e conducteur·ice pas inscrit·e
+   * (déclarée par un·e de ses passager·es) ou un véhicule de l'orga pour une
+   * navette. Si une voiture sans propriétaire porte déjà ce nom dans
+   * l'évènement, on la reprend : deux passager·es de la même voiture qui
+   * tapent le même nom se retrouvent dedans ensemble.
+   */
+  async findOrCreateOwnerless(
+    eventId: string,
+    rawName: string,
+    seats: number,
+    lendingMode: VehicleLendingMode,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<Car> {
+    const name = normalizeCarName(rawName);
+    if (!name) throw new BadRequestException("Le nom de la voiture est vide");
+    const existing = await db.car.findFirst({
+      where: { eventId, ownerPaxId: null, name: { equals: name, mode: "insensitive" } },
+    });
+    if (existing) return existing;
+    return db.car.create({ data: { eventId, ownerPaxId: null, name, seats, lendingMode } });
+  }
+
+  /**
+   * Un pax revendique une voiture sans propriétaire ("c'est la mienne") : iel
+   * en devient le/la propriétaire. S'iel s'y était déclaré·e passager·e, iel
+   * en devient le/la conducteur·ice pour ces trajets.
+   */
+  async claim(pax: Pax, carId: string): Promise<Car> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM cars WHERE id = ${carId} FOR UPDATE`;
+      const car = await tx.car.findUnique({ where: { id: carId } });
+      if (!car || car.eventId !== pax.eventId) {
+        throw new NotFoundException("Cette voiture n'existe pas dans cet évènement");
+      }
+      if (car.ownerPaxId) throw new BadRequestException("Cette voiture a déjà un·e propriétaire");
+      if (await tx.car.findUnique({ where: { ownerPaxId: pax.id } })) {
+        throw new BadRequestException(
+          "Tu as déjà une voiture déclarée : retire-la d'abord si c'est celle-ci",
+        );
+      }
+      await tx.trip.updateMany({
+        where: { paxId: pax.id, carId, carpoolRole: "PASSENGER" },
+        data: { carpoolRole: "DRIVER", lookingForCarpool: false },
+      });
+      await tx.pax.update({ where: { id: pax.id }, data: { hasVehicle: true } });
+      return tx.car.update({ where: { id: carId }, data: { ownerPaxId: pax.id } });
+    });
   }
 
   /** Toutes les voitures de l'évènement, avec les places restantes par direction. */
@@ -112,4 +186,9 @@ export class CarsService {
     }
     return car;
   }
+}
+
+/** Normalise un nom de voiture saisi : espaces superflus retirés. */
+export function normalizeCarName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
 }

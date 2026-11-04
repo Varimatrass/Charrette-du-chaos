@@ -86,3 +86,22 @@ tr.me-row {
     grid-column: 1 / -1;
   }
 }
+
+.seats-overbooked {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+// Historique des modifications d'un trajet (orga).
+.change-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.85rem;
+
+  li {
+    margin-bottom: 0.25rem;
+  }
+}

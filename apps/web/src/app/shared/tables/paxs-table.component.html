@@ -17,6 +17,11 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="discord">
+      <th mat-header-cell *matHeaderCellDef>Discord</th>
+      <td mat-cell *matCellDef="let row">{{ row.discordHandle || "—" }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="outbound">
       <th mat-header-cell *matHeaderCellDef>Aller</th>
       <td mat-cell *matCellDef="let row">{{ row.outbound }}</td>
@@ -56,6 +61,21 @@
             </button>
           </div>
         }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let row">
+        <button
+          mat-icon-button
+          type="button"
+          [attr.aria-label]="'Supprimer ' + row.name"
+          title="Supprimer ce pax"
+          (click)="deletePax(row)"
+        >
+          <mat-icon>delete_outline</mat-icon>
+        </button>
       </td>
     </ng-container>
 

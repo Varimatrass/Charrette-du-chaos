@@ -7,14 +7,22 @@ import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatTableModule } from "@angular/material/table";
 import { HttpErrorResponse } from "@angular/common/http";
 import { forkJoin, of } from "rxjs";
-import { catchError } from "rxjs/operators";
-import { Direction, TripStatus, WaitLevel } from "@desordre/shared-types";
-import type { ShuttleWithRemainingSeats, TripOverview, TripWithPax } from "@desordre/shared-types";
+import { catchError, map } from "rxjs/operators";
+import { Direction, TransportMode, TripStatus, WaitLevel } from "@desordre/shared-types";
+import type {
+  ShuttleWithRemainingSeats,
+  TripChangeField,
+  TripFieldChange,
+  TripOverview,
+  TripWithPax,
+} from "@desordre/shared-types";
+import { TRANSPORT_MODE_LABELS } from "../../core/labels";
 import { AdminApiService } from "../../core/api/admin-api.service";
+import { EventsApiService } from "../../core/api/events-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
 import { EntityOption, EntitySelectComponent } from "../entity-select/entity-select.component";
-import { DIRECTIONS, summarizeTrip, TableContext } from "./table-role";
+import { contextEventId, DIRECTIONS, summarizeTrip, TableContext } from "./table-role";
 
 /** Une ligne, quel que soit le rôle. Les coordonnées/commentaires n'existent que côté orga. */
 interface TripRow {
@@ -23,6 +31,7 @@ interface TripRow {
   paxName: string;
   isMine: boolean;
   direction: Direction;
+  mode: TransportMode | null;
   summary: string;
   day: string | null;
   time: string | null;
@@ -32,6 +41,8 @@ interface TripRow {
   shuttleId: string | null;
   waitLevel: WaitLevel | null;
   comment?: string | null;
+  /** Orga : modifications du pax pas encore vues, en phrases ("Heure : 08:05 → 09:40"). */
+  pendingChanges?: { id: string; at: string; lines: string[] }[];
 }
 
 /**
@@ -61,6 +72,7 @@ export class TripsTableComponent {
 
   private readonly adminApi = inject(AdminApiService);
   private readonly paxApi = inject(PaxApiService);
+  private readonly eventsApi = inject(EventsApiService);
   private readonly snackBar = inject(MatSnackBar);
 
   readonly TripStatus = TripStatus;
@@ -69,6 +81,8 @@ export class TripsTableComponent {
 
   readonly direction = signal<Direction>(Direction.OUTBOUND);
   readonly statusFilter = signal<TripStatus | null>(null);
+  /** Orga : ne montrer que les trajets que le pax a modifiés depuis la dernière vérification. */
+  readonly onlyChanged = signal(false);
   readonly rows = signal<TripRow[]>([]);
   readonly shuttles = signal<ShuttleWithRemainingSeats[]>([]);
   readonly loading = signal(true);
@@ -83,21 +97,41 @@ export class TripsTableComponent {
     this.rows().filter(
       (row) =>
         row.direction === this.direction() &&
-        (this.statusFilter() === null || row.status === this.statusFilter()),
+        (this.statusFilter() === null || row.status === this.statusFilter()) &&
+        (!this.onlyChanged() || !!row.pendingChanges?.length),
     ),
   );
 
-  /** Navettes proposables pour la direction affichée ; les pleines restent visibles mais grisées côté pax. */
-  readonly shuttleOptions = computed<EntityOption[]>(() =>
-    this.shuttles()
-      .filter((shuttle) => shuttle.direction === this.direction())
-      .map((shuttle) => ({
-        id: shuttle.id,
-        label: shuttle.label,
-        hint: `${shuttle.departureTime} · ${shuttle.remainingSeats} place${shuttle.remainingSeats > 1 ? "s" : ""}`,
-        disabled: !this.isAdmin() && shuttle.remainingSeats <= 0,
-      })),
-  );
+  /**
+   * Navettes proposables pour chaque ligne qu'on peut modifier, dans la
+   * direction affichée. Côté pax, les pleines et celles d'un autre jour que
+   * son trajet restent visibles mais grisées (avec la raison) ; l'orga peut
+   * tout choisir (surbooking compris), le jour différent est juste signalé.
+   */
+  readonly shuttleOptionsByRow = computed(() => {
+    const options = new Map<string, EntityOption[]>();
+    const shuttles = this.shuttles().filter((shuttle) => shuttle.direction === this.direction());
+    for (const row of this.visibleRows()) {
+      if (!this.canAssign(row)) continue;
+      options.set(
+        row.id,
+        shuttles.map((shuttle) => {
+          const otherDay = !!row.day && sameDay(row.day, shuttle.day) === false;
+          const seats = shuttle.remainingSeats;
+          const seatsHint =
+            seats < 0 ? `surbookée (+${-seats})` : `${seats} place${seats > 1 ? "s" : ""}`;
+          const dayHint = otherDay ? ` · ${formatDay(shuttle.day)}, pas ton jour` : "";
+          return {
+            id: shuttle.id,
+            label: shuttle.label,
+            hint: `${formatDay(shuttle.day)} ${shuttle.departureTime} · ${seatsHint}${this.isAdmin() ? "" : dayHint}`,
+            disabled: !this.isAdmin() && shuttle.id !== row.shuttleId && (seats <= 0 || otherDay),
+          };
+        }),
+      );
+    }
+    return options;
+  });
 
   constructor() {
     effect(() => this.load(this.context()));
@@ -110,8 +144,9 @@ export class TripsTableComponent {
         trips: this.adminApi.listTrips(context.eventId),
         shuttles: this.adminApi.listShuttles(context.eventId),
         cars: this.adminApi.listCars(context.eventId).pipe(catchError(() => of([]))),
+        preferredStationId: this.preferredStationId(context),
       }).subscribe({
-        next: ({ trips, shuttles, cars }) => {
+        next: ({ trips, shuttles, cars, preferredStationId }) => {
           const shuttlesById = new Map(shuttles.map((s) => [s.id, s]));
           const carsById = new Map(cars.map((c) => [c.id, c]));
           this.shuttles.set(shuttles);
@@ -122,7 +157,8 @@ export class TripsTableComponent {
               paxName: trip.pax.name,
               isMine: false,
               direction: trip.direction,
-              summary: summarizeTrip(trip, shuttlesById, carsById),
+              mode: trip.mode,
+              summary: summarizeTrip(trip, shuttlesById, carsById, preferredStationId),
               day: trip.day,
               time: trip.time,
               stationName: trip.station?.name ?? null,
@@ -131,6 +167,11 @@ export class TripsTableComponent {
               shuttleId: trip.shuttleId,
               waitLevel: trip.waitLevel,
               comment: trip.comment,
+              pendingChanges: trip.pendingChanges.map((change) => ({
+                id: change.id,
+                at: change.createdAt,
+                lines: change.changes.map(describeFieldChange),
+              })),
             })),
           );
           this.loading.set(false);
@@ -145,8 +186,9 @@ export class TripsTableComponent {
       trips: this.paxApi.listMyEventTrips(token),
       shuttles: this.paxApi.listMyEventShuttles(token),
       cars: this.paxApi.listMyEventCars(token).pipe(catchError(() => of([]))),
+      preferredStationId: this.preferredStationId(context),
     }).subscribe({
-      next: ({ trips, shuttles, cars }) => {
+      next: ({ trips, shuttles, cars, preferredStationId }) => {
         const shuttlesById = new Map(shuttles.map((s) => [s.id, s]));
         const carsById = new Map(cars.map((c) => [c.id, c]));
         this.shuttles.set(shuttles);
@@ -157,7 +199,8 @@ export class TripsTableComponent {
             paxName: trip.paxName,
             isMine: trip.paxId === context.myPaxId,
             direction: trip.direction,
-            summary: summarizeTrip(trip, shuttlesById, carsById),
+            mode: trip.mode,
+            summary: summarizeTrip(trip, shuttlesById, carsById, preferredStationId),
             day: trip.day,
             time: trip.time,
             stationName: trip.stationName,
@@ -173,6 +216,17 @@ export class TripsTableComponent {
     });
   }
 
+  /** La gare desservie par les navettes (pour le résumé des trajets en train). */
+  private preferredStationId(context: TableContext) {
+    const eventId = contextEventId(context);
+    return eventId
+      ? this.eventsApi.get(eventId).pipe(
+          map((event) => event.preferredStationId),
+          catchError(() => of(null)),
+        )
+      : of(null);
+  }
+
   setDirection(direction: Direction): void {
     this.direction.set(direction);
   }
@@ -181,9 +235,12 @@ export class TripsTableComponent {
     this.statusFilter.set(status);
   }
 
-  /** Un pax ne peut changer de navette que pour son propre trajet ; l'orga pour tous. */
+  /**
+   * Les navettes sont réservées aux trajets en train. Un pax ne peut changer
+   * de navette que pour son propre trajet ; l'orga pour tous.
+   */
   canAssign(row: TripRow): boolean {
-    return this.isAdmin() || row.isMine;
+    return row.mode === TransportMode.TRAIN && (this.isAdmin() || row.isMine);
   }
 
   onShuttleChange(row: TripRow, shuttleId: string | null): void {
@@ -213,10 +270,60 @@ export class TripsTableComponent {
     return this.shuttles().find((shuttle) => shuttle.id === shuttleId)?.label ?? "?";
   }
 
+  /** Nombre de trajets (de la direction affichée) modifiés depuis la dernière vérification. */
+  readonly changedCount = computed(
+    () =>
+      this.rows().filter((row) => row.direction === this.direction() && row.pendingChanges?.length)
+        .length,
+  );
+
+  /** L'orga a vu les modifications (sans changer le statut du trajet). */
+  acknowledgeChanges(row: TripRow): void {
+    this.adminApi.acknowledgeTripChanges(row.id).subscribe(() => {
+      this.snackBar.open("Modifications marquées comme vues.", undefined, { duration: 2000 });
+      this.load();
+    });
+  }
+
   markAsChecked(row: TripRow): void {
     this.adminApi.setTripStatus(row.id, { status: TripStatus.ASSIGNED }).subscribe(() => {
       this.snackBar.open("Marqué comme vérifié.", undefined, { duration: 2000 });
       this.load();
     });
   }
+}
+
+/** Compare deux dates ISO (avec ou sans heure) au jour près. */
+function sameDay(a: string, b: string): boolean {
+  return a.slice(0, 10) === b.slice(0, 10);
+}
+
+/** "ven. 18/09" : assez court pour tenir dans un indice de sélecteur. */
+function formatDay(isoDate: string): string {
+  return new Date(isoDate.slice(0, 10) + "T00:00:00Z").toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  });
+}
+
+const CHANGE_FIELD_LABELS: Record<TripChangeField, string> = {
+  mode: "Transport",
+  day: "Jour",
+  time: "Heure",
+  station: "Gare",
+  comment: "Commentaire",
+  shuttle: "Navette",
+};
+
+/** "Heure : 08:05 → 09:40", avec les valeurs lisibles (mode en français, jour formaté). */
+function describeFieldChange(change: TripFieldChange): string {
+  const show = (value: string | null): string => {
+    if (value === null || value === "") return "—";
+    if (change.field === "mode") return TRANSPORT_MODE_LABELS[value as TransportMode] ?? value;
+    if (change.field === "day") return formatDay(value);
+    return value;
+  };
+  return `${CHANGE_FIELD_LABELS[change.field]} : ${show(change.before)} → ${show(change.after)}`;
 }

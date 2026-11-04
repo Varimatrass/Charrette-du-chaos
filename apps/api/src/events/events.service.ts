@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Event, Station } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service.js";
-import { toDate } from "../common/utils/dates.js";
+import { isoDay, toDate } from "../common/utils/dates.js";
 import { omitUndefined } from "../common/utils/objects.js";
 import { CreateEventDto } from "./dto/create-event.dto.js";
 import { UpdateEventDto } from "./dto/update-event.dto.js";
@@ -16,6 +16,7 @@ export class EventsService {
 
   /** Crée l'évènement et ses gares ; la première gare devient la gare préférée. */
   async create(dto: CreateEventDto): Promise<EventWithStations> {
+    ensureDatesInOrder(toDate(dto.startDate), toDate(dto.endDate));
     const stationNames = uniqueStationNames(dto.stations ?? []);
     const event = await this.prisma.event.create({
       data: {
@@ -59,6 +60,10 @@ export class EventsService {
 
   async update(id: string, dto: UpdateEventDto): Promise<EventWithStations> {
     const event = await this.findOne(id);
+    ensureDatesInOrder(
+      dto.startDate === undefined ? event.startDate : toDate(dto.startDate),
+      dto.endDate === undefined ? event.endDate : toDate(dto.endDate),
+    );
     if (dto.preferredStationId && !event.stations.some((s) => s.id === dto.preferredStationId)) {
       throw new BadRequestException("La gare préférée doit être une gare de cet évènement");
     }
@@ -87,4 +92,13 @@ function uniqueStationNames(names: string[]): string[] {
     result.push(name);
   }
   return result;
+}
+
+/** Un évènement ne peut pas finir avant d'avoir commencé. */
+function ensureDatesInOrder(startDate: Date, endDate: Date): void {
+  if (isoDay(endDate) < isoDay(startDate)) {
+    throw new BadRequestException(
+      "La date de fin doit être le même jour ou après la date de début",
+    );
+  }
 }

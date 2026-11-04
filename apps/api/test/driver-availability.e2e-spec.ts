@@ -44,6 +44,13 @@ describe("Driver availability slots (e2e)", () => {
   it("validates the payload and requires a token", async () => {
     await t.http().post("/pax/me/availability-slots").set(t.asPax(token)).send({}).expect(400);
     await t.http().post("/pax/me/availability-slots").send({ day: "2026-09-18" }).expect(401);
+    for (const body of [
+      { day: "2026-09-25" },
+      { day: "2026-09-18", startTime: "9h" },
+      { day: "2026-09-18", startTime: "18:00", endTime: "09:00" },
+    ]) {
+      await t.http().post("/pax/me/availability-slots").set(t.asPax(token)).send(body).expect(400);
+    }
   });
 
   it("never lets a pax delete someone else's slot", async () => {

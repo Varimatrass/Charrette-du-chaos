@@ -115,3 +115,29 @@ body {
 .badge-warn-strong {
   background: #ffe0b2;
 }
+
+// Rouge : situation à corriger (navette ratée, navette surbookée…).
+.badge-danger {
+  background: #ffcdd2;
+  color: #b71c1c;
+  font-weight: 500;
+}
+
+.text-danger {
+  color: #c62828;
+  font-weight: 500;
+}
+
+// Encarts d'information (ok / attention), utilisés dans les formulaires et "mon espace".
+.notice {
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+}
+
+.notice-ok {
+  background: #e8f5e9;
+}
+
+.notice-warn {
+  background: #fff3e0;
+}
