@@ -176,9 +176,11 @@ deux cas : elle tourne toujours en conteneur.
    placer lui-même dans une navette qui a de la place (pour son propre
    trajet seulement).
 5. Dans le back-office (`/admin/events/<id>`), section **Navettes**, crée
-   les créneaux (le conducteur·ice est un pax de l'évènement) et gère les
-   passager·es ; section **Trajets**, assigne chaque pax à une navette via le
-   sélecteur.
+   les créneaux (le conducteur·ice est un pax de l'évènement, le véhicule une
+   voiture de l'évènement ou un nouveau véhicule tapé à la main) et gère les
+   passager·es ; section **Trajets**, assigne chaque trajet en train à une
+   navette via le sélecteur, et suis les modifications des paxs (filtre
+   « Modifs à voir »).
 
 Pour ne pas tout saisir à la main, `pnpm prisma:seed` crée un évènement de
 démo ("[SEED] …") avec des navettes et une dizaine de paxs dans des
@@ -246,13 +248,27 @@ packages/
 docker-compose.yml      # base de données + (optionnellement) API/frontend en conteneurs
 ```
 
-## Ce qui est fait en V1 / ce qui reste
+## Ce qui est fait / ce qui reste
 
-Fait : inscription et auto-édition libre des trajets par les paxs (lien
-personnel, sans compte, jamais bloquant), gestion des navettes et assignation
-manuelle côté back-office, indicateur de temps d'attente en gare calculé
-automatiquement, recherche d'un pax pour retrouver un lien perdu.
+Fait :
 
-Pas encore (itérations suivantes, voir la spec) : covoiturage (mise en
-relation conducteur·ices/passager·es), vraie liste de comptes organisateur·ices,
-envoi automatique d'email du lien personnel, vrai déploiement.
+- **Paxs** : inscription et auto-édition libre des trajets (lien personnel,
+  sans compte, jamais bloquant), annuaire des paxs (nom, Discord, comment
+  chacun·e vient — jamais l'email ni le téléphone), auto-placement dans une
+  navette pour son propre trajet en train (même sens, même jour, s'il reste
+  de la place).
+- **Covoiturage** : une voiture par pax, passager·es avec une place ou « je
+  cherche », voitures sans propriétaire (conducteur·ice pas inscrit·e, ou
+  véhicule de l'orga) que leur conducteur·ice peut revendiquer.
+- **Navettes** (réservées aux trajets en train) : création/modification/
+  suppression par l'orga, conducteur·ice et véhicule choisis parmi les paxs
+  et les voitures de l'évènement, surbooking possible mais signalé en rouge,
+  confirmation quand une modif fait sortir des passager·es.
+- **Suivi orga** : statut des trajets (en attente / assigné / à revérifier /
+  sans navette), historique de ce que les paxs ont modifié depuis la
+  dernière vérification, indicateur d'attente en gare calculé (dont « navette
+  ratée »), suppression d'un pax (doublon), lien perdu retrouvable.
+
+Pas encore (voir la spec) : vraie liste de comptes organisateur·ices, SSO
+Google, envoi automatique du lien personnel, tests Angular, vrai
+déploiement.
