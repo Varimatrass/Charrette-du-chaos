@@ -112,6 +112,10 @@ export class AdminApiService {
     return this.http.patch<Trip>(apiUrl(`admin/trips/${id}/assign`), input);
   }
 
+  acknowledgeTripChanges(id: string): Observable<void> {
+    return this.http.post<void>(apiUrl(`admin/trips/${id}/acknowledge-changes`), null);
+  }
+
   setTripStatus(id: string, input: SetTripStatusInput): Observable<Trip> {
     return this.http.patch<Trip>(apiUrl(`admin/trips/${id}/status`), input);
   }

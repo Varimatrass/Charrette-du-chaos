@@ -151,11 +151,37 @@ export interface Shuttle {
   updatedAt: string;
 }
 
+/** Ce qui peut changer sur un trajet et intéresser l'orga qui a placé le pax dans une navette. */
+export type TripChangeField = "mode" | "day" | "time" | "station" | "comment" | "shuttle";
+
+/**
+ * Un champ modifié, avant → après, en clair : `mode` est une valeur de
+ * TransportMode, `day` un jour AAAA-MM-JJ, `station` / `shuttle` des noms.
+ * `null` = vide / pas encore décidé.
+ */
+export interface TripFieldChange {
+  field: TripChangeField;
+  before: string | null;
+  after: string | null;
+}
+
+/** Une modification faite par le pax sur un trajet placé dans une navette. */
+export interface TripChange {
+  id: string;
+  tripId: string;
+  changes: TripFieldChange[];
+  /** `null` tant que l'orga ne l'a pas marquée comme vue. */
+  acknowledgedAt: string | null;
+  createdAt: string;
+}
+
 /** Un trajet avec le pax qu'il concerne, pour l'affichage admin. */
 export interface TripWithPax extends Trip {
   pax: Pax;
   station: Station | null;
   waitLevel: WaitLevel | null;
+  /** Modifications pas encore vues par l'orga, de la plus ancienne à la plus récente. */
+  pendingChanges: TripChange[];
 }
 
 /** Le véhicule d'une navette tel qu'affiché : son nom, à qui il est, s'il est prêté. */

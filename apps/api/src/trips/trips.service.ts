@@ -7,6 +7,7 @@ import {
   TripStatus,
   VehicleLendingMode,
 } from "@desordre/shared-types";
+import type { TripChangeField, TripFieldChange } from "@desordre/shared-types";
 import { frenchDay, isoDay, toDate, toDateOrNull } from "../common/utils/dates.js";
 import { computeWaitLevel } from "../common/utils/wait-level.js";
 import { CarsService } from "../cars/cars.service.js";
@@ -111,19 +112,81 @@ export class TripsService {
 
       // Quitter le train fait sortir de la navette : la place se libère et le
       // trajet n'a plus besoin de navette. En train, une assignation existante
-      // est gardée mais marquée "à revérifier".
+      // est gardée mais marquée "à revérifier" si quelque chose a changé.
       const keepsShuttle = fields.mode === TransportMode.TRAIN && existing.shuttleId !== null;
+      const shuttleId = keepsShuttle ? existing.shuttleId : null;
+
+      let status = keepsShuttle ? existing.status : statusWithoutShuttle(fields.mode);
+      if (existing.shuttleId) {
+        // Le pax était placé dans une navette : on garde la trace de ce qui a
+        // changé pour que l'orga sache quoi revérifier.
+        const changes = await this.describeChanges(tx, existing, { ...fields, shuttleId });
+        if (changes.length > 0) {
+          await tx.tripChange.create({
+            data: { tripId: existing.id, changes: changes as unknown as Prisma.InputJsonValue },
+          });
+          if (keepsShuttle) status = statusAfterPaxEdit(existing.status);
+        }
+      }
+
       return tx.trip.update({
         where: { id: existing.id },
         data: {
           ...fields,
-          shuttleId: keepsShuttle ? existing.shuttleId : null,
+          shuttleId,
           shuttleAssignedAt: keepsShuttle ? existing.shuttleAssignedAt : null,
-          status: keepsShuttle
-            ? statusAfterPaxEdit(existing.status)
-            : statusWithoutShuttle(fields.mode),
+          status,
         },
       });
+    });
+  }
+
+  /** Ce qui change entre le trajet en base et ce que le pax envoie, en clair (noms de gare/navette). */
+  private async describeChanges(
+    tx: Prisma.TransactionClient,
+    before: Trip,
+    after: Pick<Trip, "mode" | "day" | "time" | "comment" | "stationId" | "shuttleId">,
+  ): Promise<TripFieldChange[]> {
+    const stationIds = [before.stationId, after.stationId].filter((id): id is string => !!id);
+    const stations = stationIds.length
+      ? await tx.station.findMany({ where: { id: { in: stationIds } } })
+      : [];
+    const stationName = (id: string | null) => stations.find((st) => st.id === id)?.name ?? null;
+    const shuttle = before.shuttleId
+      ? await tx.shuttle.findUnique({ where: { id: before.shuttleId }, select: { label: true } })
+      : null;
+    const shuttleLabel = (id: string | null) => (id ? (shuttle?.label ?? id) : null);
+
+    return diffTripFields(
+      {
+        mode: before.mode,
+        day: before.day ? isoDay(before.day) : null,
+        time: before.time,
+        station: stationName(before.stationId),
+        comment: before.comment,
+        shuttle: shuttleLabel(before.shuttleId),
+      },
+      {
+        mode: after.mode,
+        day: after.day ? isoDay(after.day) : null,
+        time: after.time,
+        station: stationName(after.stationId),
+        comment: after.comment,
+        shuttle: after.shuttleId === before.shuttleId ? shuttleLabel(before.shuttleId) : null,
+      },
+    );
+  }
+
+  /** L'orga a revérifié ce trajet : ses modifications en attente sont marquées comme vues. */
+  async acknowledgeChanges(id: string): Promise<void> {
+    await this.findOneOrThrow(id);
+    await this.acknowledgePendingChanges(id);
+  }
+
+  private acknowledgePendingChanges(tripId: string) {
+    return this.prisma.tripChange.updateMany({
+      where: { tripId, acknowledgedAt: null },
+      data: { acknowledgedAt: new Date() },
     });
   }
 
@@ -306,12 +369,18 @@ export class TripsService {
   async findAllForEvent(eventId: string, status?: TripStatus, direction?: Direction) {
     const trips = await this.prisma.trip.findMany({
       where: { eventId, ...(status && { status }), ...(direction && { direction }) },
-      include: { pax: true, station: true, shuttle: { select: { stationArrivalTime: true } } },
+      include: {
+        pax: true,
+        station: true,
+        shuttle: { select: { stationArrivalTime: true } },
+        changes: { where: { acknowledgedAt: null }, orderBy: { createdAt: "asc" } },
+      },
       orderBy: [...TRIPS_ORDER],
     });
 
-    return trips.map(({ shuttle, ...trip }) => ({
+    return trips.map(({ shuttle, changes, ...trip }) => ({
       ...trip,
+      pendingChanges: changes,
       waitLevel: shuttle
         ? computeWaitLevel(trip.direction, trip.time, shuttle.stationArrivalTime)
         : null,
@@ -379,6 +448,8 @@ export class TripsService {
         throw new BadRequestException("Cette navette ne va pas dans le bon sens");
       }
     }
+    // Replacer le trajet, c'est l'avoir revérifié.
+    await this.acknowledgePendingChanges(id);
     return this.prisma.trip.update({
       where: { id },
       data: {
@@ -389,8 +460,10 @@ export class TripsService {
     });
   }
 
+  /** Changer le statut (ex: "marquer vérifié") vaut revérification : les modifs en attente sont vues. */
   async setStatus(id: string, dto: SetTripStatusDto): Promise<Trip> {
     await this.findOneOrThrow(id);
+    await this.acknowledgePendingChanges(id);
     return this.prisma.trip.update({ where: { id }, data: { status: dto.status } });
   }
 
@@ -399,4 +472,23 @@ export class TripsService {
     if (!trip) throw new NotFoundException("Trajet introuvable");
     return trip;
   }
+}
+
+/** Les champs d'un trajet qui comptent pour l'orga, en clair. */
+type TripSnapshot = Record<TripChangeField, string | null>;
+
+const TRACKED_FIELDS: readonly TripChangeField[] = [
+  "mode",
+  "day",
+  "time",
+  "station",
+  "comment",
+  "shuttle",
+];
+
+/** Liste des champs qui changent entre deux versions d'un trajet (vide = rien de neuf). */
+export function diffTripFields(before: TripSnapshot, after: TripSnapshot): TripFieldChange[] {
+  return TRACKED_FIELDS.filter((field) => (before[field] ?? null) !== (after[field] ?? null)).map(
+    (field) => ({ field, before: before[field] ?? null, after: after[field] ?? null }),
+  );
 }

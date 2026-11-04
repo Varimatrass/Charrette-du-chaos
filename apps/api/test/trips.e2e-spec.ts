@@ -519,6 +519,57 @@ describe("Trips (e2e)", () => {
     });
   });
 
+  describe("history of changes to recheck (P2)", () => {
+    it("records what the pax changed on a placed trip, shows it to the admin until it is acknowledged", async () => {
+      const shuttle = await make.shuttle(eventId, { label: "Navette 1" });
+      const trip = await make.trip(eventId, paxId, {
+        day: new Date("2026-09-18"),
+        stationId,
+        shuttleId: shuttle.id,
+        status: "ASSIGNED",
+      });
+      const put = (body: object) =>
+        t.http().put("/pax/me/trips/OUTBOUND").set(t.asPax(token)).send(body);
+
+      // Rien de neuf : pas de "à revérifier", pas d'historique.
+      const same = await put({ mode: "TRAIN", day: "2026-09-18", time: "08:05", stationId });
+      expect(same.body.status).toBe("ASSIGNED");
+
+      await put({ mode: "TRAIN", day: "2026-09-18", time: "09:40", stationId }).expect(200);
+      const list = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      const row = list.body.find((r: { id: string }) => r.id === trip.id);
+      expect(row.status).toBe("TO_RECHECK");
+      expect(row.pendingChanges).toHaveLength(1);
+      expect(row.pendingChanges[0].changes).toEqual([
+        { field: "time", before: "08:05", after: "09:40" },
+      ]);
+
+      // "Marquer vérifié" acquitte l'historique.
+      await t
+        .http()
+        .patch(`/admin/trips/${trip.id}/status`)
+        .set(t.asAdmin)
+        .send({ status: "ASSIGNED" })
+        .expect(200);
+      const after = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      expect(after.body.find((r: { id: string }) => r.id === trip.id).pendingChanges).toEqual([]);
+
+      // Quitter le train : l'orga voit que le pax est sorti de la navette.
+      await put({ mode: "OTHER" }).expect(200);
+      const left = await t.http().get(`/admin/trips?eventId=${eventId}`).set(t.asAdmin);
+      const leftRow = left.body.find((r: { id: string }) => r.id === trip.id);
+      expect(leftRow.status).toBe("NO_SHUTTLE");
+      expect(leftRow.pendingChanges[0].changes).toEqual(
+        expect.arrayContaining([
+          { field: "mode", before: "TRAIN", after: "OTHER" },
+          { field: "shuttle", before: "Navette 1", after: null },
+        ]),
+      );
+      await t.http().post(`/admin/trips/${trip.id}/acknowledge-changes`).set(t.asAdmin).expect(204);
+      expect(await t.prisma.tripChange.count({ where: { acknowledgedAt: null } })).toBe(0);
+    });
+  });
+
   describe("GET /pax/me/trips (overview for other paxs)", () => {
     it("shows names and shuttle labels but no comments or contact details", async () => {
       const shuttle = await make.shuttle(eventId, { label: "Matin", stationArrivalTime: "08:25" });

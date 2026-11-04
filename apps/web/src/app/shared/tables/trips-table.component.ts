@@ -9,7 +9,14 @@ import { HttpErrorResponse } from "@angular/common/http";
 import { forkJoin, of } from "rxjs";
 import { catchError } from "rxjs/operators";
 import { Direction, TransportMode, TripStatus, WaitLevel } from "@desordre/shared-types";
-import type { ShuttleWithRemainingSeats, TripOverview, TripWithPax } from "@desordre/shared-types";
+import type {
+  ShuttleWithRemainingSeats,
+  TripChangeField,
+  TripFieldChange,
+  TripOverview,
+  TripWithPax,
+} from "@desordre/shared-types";
+import { TRANSPORT_MODE_LABELS } from "../../core/labels";
 import { AdminApiService } from "../../core/api/admin-api.service";
 import { PaxApiService } from "../../core/api/pax-api.service";
 import { LABEL_PIPES } from "../../core/pipes/label.pipes";
@@ -33,6 +40,8 @@ interface TripRow {
   shuttleId: string | null;
   waitLevel: WaitLevel | null;
   comment?: string | null;
+  /** Orga : modifications du pax pas encore vues, en phrases ("Heure : 08:05 → 09:40"). */
+  pendingChanges?: { id: string; at: string; lines: string[] }[];
 }
 
 /**
@@ -70,6 +79,8 @@ export class TripsTableComponent {
 
   readonly direction = signal<Direction>(Direction.OUTBOUND);
   readonly statusFilter = signal<TripStatus | null>(null);
+  /** Orga : ne montrer que les trajets que le pax a modifiés depuis la dernière vérification. */
+  readonly onlyChanged = signal(false);
   readonly rows = signal<TripRow[]>([]);
   readonly shuttles = signal<ShuttleWithRemainingSeats[]>([]);
   readonly loading = signal(true);
@@ -84,7 +95,8 @@ export class TripsTableComponent {
     this.rows().filter(
       (row) =>
         row.direction === this.direction() &&
-        (this.statusFilter() === null || row.status === this.statusFilter()),
+        (this.statusFilter() === null || row.status === this.statusFilter()) &&
+        (!this.onlyChanged() || !!row.pendingChanges?.length),
     ),
   );
 
@@ -152,6 +164,11 @@ export class TripsTableComponent {
               shuttleId: trip.shuttleId,
               waitLevel: trip.waitLevel,
               comment: trip.comment,
+              pendingChanges: trip.pendingChanges.map((change) => ({
+                id: change.id,
+                at: change.createdAt,
+                lines: change.changes.map(describeFieldChange),
+              })),
             })),
           );
           this.loading.set(false);
@@ -238,6 +255,21 @@ export class TripsTableComponent {
     return this.shuttles().find((shuttle) => shuttle.id === shuttleId)?.label ?? "?";
   }
 
+  /** Nombre de trajets (de la direction affichée) modifiés depuis la dernière vérification. */
+  readonly changedCount = computed(
+    () =>
+      this.rows().filter((row) => row.direction === this.direction() && row.pendingChanges?.length)
+        .length,
+  );
+
+  /** L'orga a vu les modifications (sans changer le statut du trajet). */
+  acknowledgeChanges(row: TripRow): void {
+    this.adminApi.acknowledgeTripChanges(row.id).subscribe(() => {
+      this.snackBar.open("Modifications marquées comme vues.", undefined, { duration: 2000 });
+      this.load();
+    });
+  }
+
   markAsChecked(row: TripRow): void {
     this.adminApi.setTripStatus(row.id, { status: TripStatus.ASSIGNED }).subscribe(() => {
       this.snackBar.open("Marqué comme vérifié.", undefined, { duration: 2000 });
@@ -259,4 +291,24 @@ function formatDay(isoDate: string): string {
     month: "2-digit",
     timeZone: "UTC",
   });
+}
+
+const CHANGE_FIELD_LABELS: Record<TripChangeField, string> = {
+  mode: "Transport",
+  day: "Jour",
+  time: "Heure",
+  station: "Gare",
+  comment: "Commentaire",
+  shuttle: "Navette",
+};
+
+/** "Heure : 08:05 → 09:40", avec les valeurs lisibles (mode en français, jour formaté). */
+function describeFieldChange(change: TripFieldChange): string {
+  const show = (value: string | null): string => {
+    if (value === null || value === "") return "—";
+    if (change.field === "mode") return TRANSPORT_MODE_LABELS[value as TransportMode] ?? value;
+    if (change.field === "day") return formatDay(value);
+    return value;
+  };
+  return `${CHANGE_FIELD_LABELS[change.field]} : ${show(change.before)} → ${show(change.after)}`;
 }

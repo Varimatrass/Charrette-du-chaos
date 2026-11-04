@@ -224,11 +224,12 @@ model Trip {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  pax     Pax      @relation(fields: [paxId], references: [id], onDelete: Cascade)
-  shuttle Shuttle? @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
-  station Station? @relation(fields: [stationId], references: [id], onDelete: SetNull)
-  car     Car?     @relation(fields: [carId], references: [id], onDelete: SetNull)
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  pax     Pax          @relation(fields: [paxId], references: [id], onDelete: Cascade)
+  shuttle Shuttle?     @relation(fields: [shuttleId], references: [id], onDelete: SetNull)
+  station Station?     @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  car     Car?         @relation(fields: [carId], references: [id], onDelete: SetNull)
+  changes TripChange[]
 
   // Un pax n'a qu'un seul trajet par direction (aller / retour) et par
   // évènement. Il reste librement modifiable, jamais dupliqué.
@@ -238,6 +239,23 @@ model Trip {
   @@index([stationId])
   @@index([carId])
   @@map("trips")
+}
+
+// Modification faite par un pax sur un trajet placé dans une navette : ce qui
+// a changé (avant → après, en clair). L'orga la marque comme vue une fois
+// l'assignation revérifiée (`acknowledgedAt`).
+model TripChange {
+  id             String    @id @default(uuid())
+  tripId         String    @map("trip_id")
+  // Liste de { field, before, after } (voir TripFieldChange dans shared-types).
+  changes        Json
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_changes")
 }
 
 // Créneau où un·e pax ayant accepté de conduire des navettes se déclare

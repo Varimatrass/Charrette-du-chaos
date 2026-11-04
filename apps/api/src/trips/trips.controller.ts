@@ -2,9 +2,12 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -63,5 +66,13 @@ export class TripsController {
   @Patch("admin/trips/:id/status")
   setStatus(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SetTripStatusDto) {
     return this.tripsService.setStatus(id, dto);
+  }
+
+  /** L'orga a vu les modifications du pax sur ce trajet (sans changer son statut). */
+  @UseGuards(AdminGuard)
+  @Post("admin/trips/:id/acknowledge-changes")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  acknowledgeChanges(@Param("id", ParseUUIDPipe) id: string) {
+    return this.tripsService.acknowledgeChanges(id);
   }
 }
